@@ -1,30 +1,25 @@
-// backend/db.js
 const mysql = require("mysql2/promise");
 require("dotenv").config();
 
-// Hydrology DB (Live AWS Data)
+// Main Hydrology DB (AWS + EWS station data)
 const hydrologyDB = mysql.createPool({
-  host: process.env.HYDROLOGY_DB_HOST || "localhost",
-  user: process.env.HYDROLOGY_DB_USER || "hydrology_admin",
-  password: process.env.HYDROLOGY_DB_PASSWORD || "Hydrology@2025",
-  database: process.env.HYDROLOGY_DB_NAME || "Hydrology",
-  port: process.env.HYDROLOGY_DB_PORT || 3306,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
+  host: process.env.HYDROLOGY_DB_HOST,
+  user: process.env.HYDROLOGY_DB_USER,
+  password: process.env.HYDROLOGY_DB_PASSWORD,
+  database: "Hydrology",
+  port: 3306,
 });
 
-// Test connection (non-blocking)
-(async () => {
-  try {
-    const conn = await hydrologyDB.getConnection();
-    console.log("✅ Connected to Hydrology Database!");
-    conn.release();
-  } catch (err) {
-    console.error("❌ Hydrology DB connection failed:", err.message);
-  }
-})();
+// USERS DB (authentication DB)
+const usersDB = mysql.createPool({
+  host: process.env.HYDROLOGY_DB_HOST,
+  user: process.env.HYDROLOGY_DB_USER,
+  password: process.env.HYDROLOGY_DB_PASSWORD,
+  database: "cdc_user_db",
+  port: 3306,
+});
 
 module.exports = {
   hydrologyDB,
+  usersDB,
 };

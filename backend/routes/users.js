@@ -1,7 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { hydrologyDB } = require("../db");
+const { usersDB } = require("../db");
 
 const router = express.Router();
 
@@ -59,7 +59,7 @@ router.post("/register", async (req, res) => {
       VALUES (?, ?, ?, ?, ?)
     `;
 
-    await hydrologyDB.query(insertQuery, [
+    await usersDB.query(insertQuery, [
       first_name,
       middle_name || null,
       last_name,
@@ -85,7 +85,7 @@ router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const [user] = await hydrologyDB.query("SELECT * FROM users WHERE email = ?", [email]);
+    const [user] = await usersDB.query("SELECT * FROM users WHERE email = ?", [email]);
     if (user.length === 0) return res.status(400).json({ error: "Invalid credentials" });
 
     const dbUser = user[0];
@@ -131,7 +131,7 @@ router.post("/admin-login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const [rows] = await hydrologyDB.query(
+    const [rows] = await usersDB.query(
       "SELECT * FROM users WHERE email = ? AND LOWER(role) = 'admin'",
       [email]
     );
@@ -187,7 +187,7 @@ router.post("/update-password", async (req, res) => {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    const [userRows] = await hydrologyDB.query("SELECT * FROM users WHERE email = ?", [email]);
+    const [userRows] = await usersDB.query("SELECT * FROM users WHERE email = ?", [email]);
     if (userRows.length === 0) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -207,12 +207,12 @@ router.post("/update-password", async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    await hydrologyDB.query(
+    await usersDB.query(
       "UPDATE users SET default_password = ?, new_password = ?, confirm_password = ? WHERE id = ?",
       [hashedPassword, hashedPassword, hashedPassword, dbUser.id]
     );
 
-    await hydrologyDB.query(
+    await usersDB.query(
       "UPDATE users SET status = 'Active' WHERE id = ? AND (status IS NULL OR status = 'Pending')",
       [dbUser.id]
     );
@@ -229,7 +229,7 @@ router.post("/update-password", async (req, res) => {
 // ====================
 router.get("/", authenticate, isAdmin, async (req, res) => {
   try {
-    const [users] = await hydrologyDB.query(
+    const [users] = await usersDB.query(
       "SELECT id, first_name, last_name, email, role, status FROM users"
     );
     res.json(users);
@@ -247,7 +247,7 @@ router.put("/update/:id", authenticate, isAdmin, async (req, res) => {
     const { first_name, last_name, email, role, status } = req.body;
     const { id } = req.params;
 
-    await hydrologyDB.query(
+    await usersDB.query(
       "UPDATE users SET first_name = ?, last_name = ?, email = ?, role = ?, status = ? WHERE id = ?",
       [first_name, last_name, email, role, status, id]
     );
@@ -265,7 +265,7 @@ router.put("/update/:id", authenticate, isAdmin, async (req, res) => {
 router.delete("/delete/:id", authenticate, isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    await hydrologyDB.query("DELETE FROM users WHERE id = ?", [id]);
+    await usersDB.query("DELETE FROM users WHERE id = ?", [id]);
     res.json({ message: "User deleted successfully" });
   } catch (error) {
     console.error("Delete User error:", error);
@@ -278,7 +278,7 @@ router.delete("/delete/:id", authenticate, isAdmin, async (req, res) => {
 // ====================
 router.get("/me", authenticate, async (req, res) => {
   try {
-    const [rows] = await hydrologyDB.query(
+    const [rows] = await usersDB.query(
       "SELECT id, first_name, middle_name, last_name, email, role, status FROM users WHERE id = ?",
       [req.user.id]
     );
@@ -299,7 +299,7 @@ router.get("/me", authenticate, async (req, res) => {
 // ===============================
 router.get("/admin/users", authenticate, isAdmin, async (req, res) => {
   try {
-    const [users] = await hydrologyDB.query(
+    const [users] = await usersDB.query(
       "SELECT id, first_name, last_name, email, role, status, default_password, new_password, confirm_password FROM users"
     );
     res.json(users);
@@ -314,7 +314,7 @@ router.put("/admin/users/:id/reset-password", authenticate, isAdmin, async (req,
     const { id } = req.params;
     const hashedPassword = await bcrypt.hash("cdc@123", 10);
 
-    await hydrologyDB.query(
+    await usersDB.query(
       "UPDATE users SET default_password = ?, new_password = ?, confirm_password = ?, status = 'Pending' WHERE id = ?",
       [hashedPassword, hashedPassword, hashedPassword, id]
     );
@@ -331,7 +331,7 @@ router.put("/admin/users/:id", authenticate, isAdmin, async (req, res) => {
     const { first_name, last_name, email, role, status } = req.body;
     const { id } = req.params;
 
-    await hydrologyDB.query(
+    await usersDB.query(
       "UPDATE users SET first_name = ?, last_name = ?, email = ?, role = ?, status = ? WHERE id = ?",
       [first_name, last_name, email, role, status, id]
     );
@@ -346,7 +346,7 @@ router.put("/admin/users/:id", authenticate, isAdmin, async (req, res) => {
 router.delete("/admin/users/:id", authenticate, isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    await hydrologyDB.query("DELETE FROM users WHERE id = ?", [id]);
+    await usersDB.query("DELETE FROM users WHERE id = ?", [id]);
     res.json({ message: "User deleted successfully" });
   } catch (error) {
     console.error("Admin Delete User error:", error);
