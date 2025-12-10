@@ -100,7 +100,8 @@ app.use('/api/aws-live', awsForecastRoute);
 // ======================================================
 // 🎨 FRONTEND STATIC FILES (Next.js export build)
 // ======================================================
-const frontendPath = path.join(__dirname, "../frontend/out");
+const frontendPath = path.join(__dirname, "../hydrology/out");
+
 app.use(express.static(frontendPath));
 
 // ✅ Serve all non-API routes to the frontend (Next.js routing)
