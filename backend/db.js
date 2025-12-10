@@ -1,57 +1,30 @@
 // backend/db.js
-const mysql = require('mysql2/promise');
-require('dotenv').config();
+const mysql = require("mysql2/promise");
+require("dotenv").config();
 
-// ---------- AWS Dummy DB ----------
-const awsDB = mysql.createPool({
-  host: process.env.AWS_DB_HOST,
-  user: process.env.AWS_DB_USER,
-  password: process.env.AWS_DB_PASSWORD,
-  database: process.env.AWS_DB_NAME,
-});
-
-// ---------- EWS Dummy DB ----------
-const ewsDB = mysql.createPool({
-  host: process.env.EWS_DB_HOST,
-  user: process.env.EWS_DB_USER,
-  password: process.env.EWS_DB_PASSWORD,
-  database: process.env.EWS_DB_NAME,
-});
-
-// ---------- CDC User DB ----------
-const cdcDB = mysql.createPool({
-  host: process.env.CDC_DB_HOST,
-  user: process.env.CDC_DB_USER,
-  password: process.env.CDC_DB_PASSWORD,
-  database: process.env.CDC_DB_NAME,
-});
-
-// ---------- NEW Hydrology (Live AWS Data) DB ----------
+// Hydrology DB (Live AWS Data)
 const hydrologyDB = mysql.createPool({
-  host: 'localhost',
-  user: 'hydrology_admin',
-  password: 'Hydrology@2025',
-  database: 'Hydrology',
+  host: process.env.HYDROLOGY_DB_HOST || "localhost",
+  user: process.env.HYDROLOGY_DB_USER || "hydrology_admin",
+  password: process.env.HYDROLOGY_DB_PASSWORD || "Hydrology@2025",
+  database: process.env.HYDROLOGY_DB_NAME || "Hydrology",
+  port: process.env.HYDROLOGY_DB_PORT || 3306,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
 });
 
-// Optional: test connection (non-blocking)
+// Test connection (non-blocking)
 (async () => {
   try {
-    const connection = await hydrologyDB.getConnection();
-    console.log('✅ Connected to Hydrology Database!');
-    connection.release();
+    const conn = await hydrologyDB.getConnection();
+    console.log("✅ Connected to Hydrology Database!");
+    conn.release();
   } catch (err) {
-    console.error('❌ Hydrology DB connection failed:', err.message);
+    console.error("❌ Hydrology DB connection failed:", err.message);
   }
 })();
 
 module.exports = {
-  awsDB,
-  ewsDB,
-  cdcDB,
-  hydrologyDB, // ✅ export the new live DB
+  hydrologyDB,
 };
-

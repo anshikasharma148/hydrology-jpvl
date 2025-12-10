@@ -31,25 +31,8 @@ router.use("/mana", manaRoutes);
 router.use("/vasudhara", vasudharaRoutes);
 
 // ---------- Hydrology DB ----------
-let db;
-(function loadDB() {
-  const paths = [
-    "/home/sr03/AWS-EWS/backend/db.js",
-    path.join(__dirname, "../../../db.js"),
-  ];
-
-  for (const p of paths) {
-    try {
-      if (fs.existsSync(p)) {
-        db = require(p).hydrologyDB;
-        console.log(`📦 Hydrology DB Loaded: ${p}`);
-        return;
-      }
-    } catch {}
-  }
-
-  console.error("❌ Hydrology DB not found");
-})();
+const { hydrologyDB: db } = require("../../db.js");
+console.log("📦 Hydrology DB Loaded: backend/db.js");
 
 // ---------- Combined Route (FULL HISTORY) ----------
 router.get("/all", async (req, res) => {
@@ -78,8 +61,8 @@ router.get("/all", async (req, res) => {
       data: {
         Lambagad: lambagad,
         Mana: mana,
-        Vasudhara: vasudhara
-      }
+        Vasudhara: vasudhara,
+      },
     });
 
   } catch (err) {
@@ -102,4 +85,3 @@ router.get("/", (req, res) => {
 });
 
 module.exports = router;
-

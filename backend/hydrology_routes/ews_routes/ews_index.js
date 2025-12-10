@@ -7,8 +7,9 @@ const router = express.Router();
 const fs = require("fs");
 const path = require("path");
 
-// Safe loader
-function importIfExists(absPath) {
+// Safe loader for route files
+function importIfExists(relPath) {
+  const absPath = path.join(__dirname, relPath);
   if (fs.existsSync(absPath)) {
     console.log("✔ Loaded EWS route:", absPath);
     return require(absPath);
@@ -17,27 +18,26 @@ function importIfExists(absPath) {
   return express.Router();
 }
 
-// Route paths
-const vasudharaPath =
-  "/home/sr03/AWS-EWS/backend/hydrology_routes/ews_routes/vasudhara_routes/vasudhara_data.js";
+// --------------------
+// ROUTE FILE PATHS
+// --------------------
+const vasudharaRoutes = importIfExists("./vasudhara_routes/vasudhara_data.js");
+const manaRoutes = importIfExists("./mana_routes/mana_data.js");
 
-const manaPath =
-  "/home/sr03/AWS-EWS/backend/hydrology_routes/ews_routes/mana_routes/mana_data.js";
-
-// Load station routes
-const vasudharaRoutes = importIfExists(vasudharaPath);
-const manaRoutes = importIfExists(manaPath);
-
+// --------------------
+// USE ROUTES
+// --------------------
 router.use("/vasudhara", vasudharaRoutes);
 router.use("/mana", manaRoutes);
 
-// DB
-const { hydrologyDB: db } = require("/home/sr03/AWS-EWS/backend/db.js");
+// --------------------
+// DATABASE
+// --------------------
+const { hydrologyDB: db } = require("../../db.js");
 
-/**
- * ALL EWS STATIONS
- * /api/ews-live/all
- */
+// --------------------
+// GET ALL STATIONS
+// --------------------
 router.get("/all", async (req, res) => {
   try {
     const [vasudhara] = await db.query(`
@@ -68,9 +68,9 @@ router.get("/all", async (req, res) => {
   }
 });
 
-/**
- * Health Route
- */
+// --------------------
+// HEALTH CHECK
+// --------------------
 router.get("/", (req, res) => {
   res.json({
     message: "EWS Live Routes Active",
@@ -83,4 +83,3 @@ router.get("/", (req, res) => {
 });
 
 module.exports = router;
-
