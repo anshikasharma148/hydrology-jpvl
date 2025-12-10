@@ -4,11 +4,12 @@
 
 const express = require("express");
 const router = express.Router();
+const path = require("path");
 
 // -------------------------------------------------------------
-// HYDROLOGY DB (ABSOLUTE PATH → PM2 SAFE)
+// HYDROLOGY DB — RELATIVE PATH (Render + Local Safe)
 // -------------------------------------------------------------
-const { hydrologyDB: db } = require("/home/sr03/AWS-EWS/backend/db.js");
+const { hydrologyDB: db } = require(path.join(__dirname, "../../../db.js"));
 
 // -------------------------------------------------------------
 // HEALTH CHECK
@@ -73,4 +74,3 @@ router.get("/all", async (req, res) => {
 });
 
 module.exports = router;
-
