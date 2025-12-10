@@ -22,10 +22,13 @@ const awsForecastRoute = require("./routes/awsForecast");
 // 🧩 MIDDLEWARES
 // ======================================================
 
+// ===============================
+// UPDATED CORS WITH RENDER DOMAIN
+// ===============================
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (mobile apps, curl, etc.)
+      // allow mobile / curl / Postman
       if (!origin) return callback(null, true);
 
       const allowedOrigins = [
@@ -34,11 +37,14 @@ app.use(
         "http://115.242.156.230:3000",
         "http://115.242.156.230:3001",
         "http://hydrology.cird.co.in",
-        "http://hydrology.cird.co.in:8080",
         "https://hydrology.cird.co.in",
+        "http://hydrology.cird.co.in:8080",
         "http://115.242.156.230:4000",
         "http://localhost:4000",
         "http://localhost:4001",
+
+        // ⭐ NEW: RENDER FRONTEND + BACKEND
+        "https://hydrology-jpvl.onrender.com",
       ];
 
       if (allowedOrigins.includes(origin)) return callback(null, true);
@@ -49,26 +55,29 @@ app.use(
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     optionsSuccessStatus: 200,
-    preflightContinue: false,
   })
 );
 
-app.use(express.json());
-app.set("trust proxy", 1);
-
-// ✅ Optional Referer logging
+// ===============================
+// UPDATED REFERER CHECK WITH RENDER DOMAIN
+// ===============================
 app.use((req, res, next) => {
   const allowedReferers = [
     "http://hydrology.cird.co.in",
     "https://hydrology.cird.co.in",
     "http://115.242.156.230:5000",
     "http://localhost:3000",
+
+    // ⭐ NEW: Allow Render domain
+    "https://hydrology-jpvl.onrender.com",
   ];
 
   const referer = req.headers.referer || "";
+
   if (referer && !allowedReferers.some((domain) => referer.startsWith(domain))) {
     console.warn(`❌ Referer check failed for: ${referer}`);
   }
+
   next();
 });
 
