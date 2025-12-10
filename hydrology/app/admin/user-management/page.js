@@ -10,7 +10,7 @@ export default function UserManagement() {
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://115.242.156.230:5000/api/users/admin/users", {
+      const res = await fetch("https://hydrology-jpvl.onrender.com/api/users/admin/users", {
         method: "GET",
         headers: {
           "Content-Type": "application/json",

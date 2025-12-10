@@ -187,7 +187,7 @@ export default function AwsPage() {
       if (isManualRefresh) setRefreshing(true);
       setError(null);
 
-      const res = await fetch("http://115.242.156.230:5000/api/aws-live/all");
+      const res = await fetch("https://hydrology-jpvl.onrender.com/api/aws-live/all");
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
 
       const json = await res.json();

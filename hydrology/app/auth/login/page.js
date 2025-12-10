@@ -41,7 +41,7 @@ export default function Login() {
     try {
       if (isFirstLogin) {
         // First login → update password
-        const res = await fetch("http://115.242.156.230:5000/api/users/update-password", {
+        const res = await fetch("https://hydrology-jpvl.onrender.com/api/users/update-password", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -58,7 +58,7 @@ export default function Login() {
         setIsFirstLogin(false);
       } else {
         // Normal login
-        const res = await fetch("http://115.242.156.230:5000/api/users/login", {
+        const res = await fetch("https://hydrology-jpvl.onrender.com/api/users/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

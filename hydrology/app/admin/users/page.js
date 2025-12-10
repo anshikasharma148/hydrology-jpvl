@@ -33,7 +33,7 @@ const AdminUserForm = () => {
     setErrorMessage('');
 
     try {
-      const response = await fetch('http://115.242.156.230:5000/api/users/register', {
+      const response = await fetch('https://hydrology-jpvl.onrender.com/api/users/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -81,10 +81,10 @@ const ReportsDashboard = () => {
 
         if (stationType === "AWS") {
           // ✅ Use new single API for both Mana and Lambagad
-          apiUrl = "http://115.242.156.230:5000/api/aws-live/all";
+          apiUrl = "https://hydrology-jpvl.onrender.com/api/aws-live/all";
         } else {
           // ✅ Use real live EWS API (replaces old dummy /api/ews-all/...)
-          apiUrl = "http://115.242.156.230:5000/api/ews-live/all";
+          apiUrl = "https://hydrology-jpvl.onrender.com/api/ews-live/all";
         }
 
         const response = await fetch(apiUrl, {

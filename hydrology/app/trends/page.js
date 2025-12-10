@@ -97,10 +97,10 @@ export default function TrendsPage() {
       let url = "";
 
       if (selectedType === "AWS") {
-        url = "http://115.242.156.230:5000/api/aws-live/all";
+        url = "https://hydrology-jpvl.onrender.com/api/aws-live/all";
       } else {
         // NEW EWS API
-        url = "http://115.242.156.230:5000/api/ews-live/all";
+        url = "https://hydrology-jpvl.onrender.com/api/ews-live/all";
       }
 
       const res = await fetch(url, {

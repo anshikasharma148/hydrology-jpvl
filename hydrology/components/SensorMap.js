@@ -111,7 +111,7 @@ const FreshSensorMap = () => {
     setLoading(true);
     try {
       // AWS
-      const awsRes = await fetch("http://115.242.156.230:5000/api/aws-live/all");
+      const awsRes = await fetch("https://hydrology-jpvl.onrender.com/api/aws-live/all");
       const awsJson = await awsRes.json();
       const awsFinal = {};
       if (awsJson?.data) {
@@ -125,7 +125,7 @@ const FreshSensorMap = () => {
       }
 
       // EWS
-      const ewsRes = await fetch("http://115.242.156.230:5000/api/ews-live/all");
+      const ewsRes = await fetch("hhttps://hydrology-jpvl.onrender.com/api/ews-live/all");
       const ewsJson = await ewsRes.json();
       const ewsFinal = {};
       if (ewsJson?.data) {

@@ -41,7 +41,7 @@ export default function EWSPage() {
 
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch("http://115.242.156.230:5000/api/ews-live/all", {
+        const res = await fetch("https://hydrology-jpvl.onrender.com/api/ews-live/all", {
           headers: { "Authorization": `Bearer ${token}` },
         });
 

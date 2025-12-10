@@ -169,7 +169,7 @@ export default function StationPage() {
   useEffect(() => {
     const fetchLiveData = async () => {
       try {
-        const res = await fetch('http://115.242.156.230:5000/api/aws-live/all');
+        const res = await fetch('https://hydrology-jpvl.onrender.com/api/aws-live/all');
         const json = await res.json();
         if (!json?.data) return;
 

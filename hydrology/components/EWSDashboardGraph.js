@@ -26,7 +26,7 @@ const WaterTrends = () => {
       try {
         setIsLoading(true);
 
-        const res = await fetch(`http://115.242.156.230:5000/api/ews-live/all`);
+        const res = await fetch(`https://hydrology-jpvl.onrender.com/api/ews-live/all`);
         const json = await res.json();
 
         if (json?.data) {

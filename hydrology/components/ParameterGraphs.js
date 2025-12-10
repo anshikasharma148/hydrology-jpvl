@@ -196,7 +196,7 @@ export default function ParameterGraphs() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch('http://115.242.156.230:5000/api/aws-live/all');
+        const res = await fetch('https://hydrology-jpvl.onrender.com/api/aws-live/all');
         const raw = await res.json();
         if (!raw?.data) return;
 
