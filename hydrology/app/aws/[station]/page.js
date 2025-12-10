@@ -1,4 +1,5 @@
 'use client';
+export const dynamic = "force-dynamic";
 import React, { useState, useEffect } from 'react';
 import {
   LineChart, Line, Tooltip, XAxis, YAxis, ResponsiveContainer, Legend, Brush, CartesianGrid

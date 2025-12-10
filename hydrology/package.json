@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+  "build": "next build",
+  "export": "next build",  
+  "start": "next start",
+  "lint": "next lint"
   },
   "dependencies": {
     "@fortawesome/react-fontawesome": "^3.0.2",
