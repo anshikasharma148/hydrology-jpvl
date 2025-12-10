@@ -1,8 +1,11 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const { awsDB, ewsDB, cdcDB, hydrologyDB } = require('./db');
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const path = require("path");
+const fs = require("fs");
+
+// Only hydrologyDB is used in current codebase
+const { hydrologyDB } = require("./db");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -10,18 +13,15 @@ const PORT = process.env.PORT || 5000;
 // ======================================================
 // ✅ IMPORT ROUTES
 // ======================================================
-const userRoutes = require('./routes/users');
-const awsLiveRoutes = require('./hydrology_routes/aws_routes/aws_index');
-const ewsLiveRoutes = require('./hydrology_routes/ews_routes/ews_index'); // ✅ NEW live routes
-const awsForecastRoute = require('./routes/awsForecast');
-
+const userRoutes = require("./routes/users");
+const awsLiveRoutes = require("./hydrology_routes/aws_routes/aws_index");
+const ewsLiveRoutes = require("./hydrology_routes/ews_routes/ews_index");
+const awsForecastRoute = require("./routes/awsForecast");
 
 // ======================================================
 // 🧩 MIDDLEWARES
 // ======================================================
 
-// ✅ Allow trusted domains (CORS)
-// ✅ Global, explicit CORS configuration
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -34,11 +34,11 @@ app.use(
         "http://115.242.156.230:3000",
         "http://115.242.156.230:3001",
         "http://hydrology.cird.co.in",
-        "http://hydrology.cird.co.in:8080", // ✅ include this
+        "http://hydrology.cird.co.in:8080",
         "https://hydrology.cird.co.in",
         "http://115.242.156.230:4000",
         "http://localhost:4000",
-        "http://localhost:4001"
+        "http://localhost:4001",
       ];
 
       if (allowedOrigins.includes(origin)) return callback(null, true);
@@ -49,83 +49,76 @@ app.use(
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     optionsSuccessStatus: 200,
-    preflightContinue: false, // ✅ ensures OPTIONS handled internally
+    preflightContinue: false,
   })
 );
 
 app.use(express.json());
-app.set('trust proxy', 1); // ✅ Required when running behind Nginx
+app.set("trust proxy", 1);
 
-// ✅ (Optional) Safe Referer validation
+// ✅ Optional Referer logging
 app.use((req, res, next) => {
   const allowedReferers = [
-    'http://hydrology.cird.co.in',
-    'https://hydrology.cird.co.in',
-    'http://115.242.156.230:5000',
-    'http://localhost:3000',
+    "http://hydrology.cird.co.in",
+    "https://hydrology.cird.co.in",
+    "http://115.242.156.230:5000",
+    "http://localhost:3000",
   ];
 
-  const referer = req.headers.referer || '';
-  if (referer && !allowedReferers.some(domain => referer.startsWith(domain))) {
+  const referer = req.headers.referer || "";
+  if (referer && !allowedReferers.some((domain) => referer.startsWith(domain))) {
     console.warn(`❌ Referer check failed for: ${referer}`);
-    // Just log, don’t block the request
   }
   next();
 });
 
 // ======================================================
-// 📦 DATABASE TABLES
-// ======================================================
-const awsTables = ['binakuli', 'mana', 'vasudhara', 'vishnu_prayag'];
-const ewsTables = ['ghastoli', 'lambagad', 'sensor_data', 'vasudhara', 'binakuli', 'mana', 'khiro'];
-
-// ======================================================
 // 🌦️ API ROUTES
 // ======================================================
 
-// ✅ REAL LIVE AWS ROUTES
-app.use('/api/aws-live', awsLiveRoutes);
-app.use('/api/ews-live', ewsLiveRoutes);
-
-// ✅ OTHER API ROUTES
-
-
-app.use('/api/users', userRoutes);
-app.use('/api/aws-live', awsForecastRoute);
-
-
-
-
+app.use("/api/aws-live", awsLiveRoutes);
+app.use("/api/ews-live", ewsLiveRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/aws-live", awsForecastRoute);
 
 // ======================================================
-// 🎨 FRONTEND STATIC FILES (Next.js export build)
+// 🎨 FRONTEND STATIC FILES (OPTIONAL)
 // ======================================================
+// For local/static builds only. On Render (SSR frontend separate),
+// this folder usually does NOT exist, so we guard it.
 const frontendPath = path.join(__dirname, "../hydrology/out");
 
-app.use(express.static(frontendPath));
+if (fs.existsSync(frontendPath)) {
+  console.log("✅ Frontend build found at:", frontendPath);
+  app.use(express.static(frontendPath));
 
-// ✅ Serve all non-API routes to the frontend (Next.js routing)
-app.get(/^(?!\/api).*/, (req, res) => {
-  res.sendFile(path.join(frontendPath, "index.html"));
-});
+  // Serve all non-API routes from the static frontend
+  app.get(/^(?!\/api).*/, (req, res) => {
+    res.sendFile(path.join(frontendPath, "index.html"));
+  });
+} else {
+  console.warn("⚠ Frontend static build not found at:", frontendPath);
+  console.warn("⚠ Skipping static file serving. This is expected on Render if frontend is SSR.");
+}
 
 // ======================================================
 // 🏠 ROOT ENDPOINT
 // ======================================================
-app.get('/', (req, res) => {
-  res.send('🌐 AWS-EWS Backend is Running!');
+app.get("/", (req, res) => {
+  res.send("🌐 AWS-EWS Backend is Running!");
 });
 
 // ======================================================
-// 🔄 KEEP-ALIVE (optional ping for Render deployment)
+// 🔄 KEEP-ALIVE (optional ping for old Render service)
 // ======================================================
 setInterval(async () => {
   try {
-    const fetch = (await import('node-fetch')).default;
-    await fetch('https://aws-ews.onrender.com/');
+    const fetch = (await import("node-fetch")).default;
+    // You can update this URL to your new backend URL if needed
+    await fetch("https://hydrology-jpvl.onrender.com/");
     console.log(`[PING] Server pinged at ${new Date().toLocaleTimeString()}`);
   } catch (err) {
-    console.error('[PING] Failed to ping:', err.message);
+    console.error("[PING] Failed to ping:", err.message);
   }
 }, 5 * 60 * 1000);
 
@@ -136,4 +129,3 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`✅ Hydrology Live API: http://localhost:${PORT}/api/aws-live`);
 });
-
