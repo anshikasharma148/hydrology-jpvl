@@ -45,6 +45,21 @@ export default function AdminLogin() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Pre-wake backend to prevent sleep issues
+  const wakeBackend = async () => {
+    try {
+      await fetch("https://hydrology-jpvl.onrender.com/api/ping", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      // Wait a moment for server to fully wake up
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (err) {
+      // Silently continue - this is just a wake-up ping
+      console.debug("Backend wake-up ping failed (continuing anyway):", err.message);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) {
@@ -54,12 +69,42 @@ export default function AdminLogin() {
     }
     setIsLoading(true);
     try {
-      const res = await fetch("https://hydrology-jpvl.onrender.com/api/users/admin-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(adminData),
-      });
-      const data = await res.json();
+      // Pre-wake backend before login to prevent sleep issues
+      await wakeBackend();
+
+      // Retry once if first attempt fails (server might be waking up)
+      let res;
+      let data;
+      let retries = 2;
+      
+      while (retries > 0) {
+        try {
+          res = await fetch("https://hydrology-jpvl.onrender.com/api/users/admin-login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(adminData),
+          });
+          data = await res.json();
+          if (res.ok) break; // Success, exit retry loop
+          
+          // If not a server error, don't retry
+          if (res.status !== 500 && res.status !== 503) {
+            setErrors({ form: data.message || "Invalid credentials" });
+            setShake(true);
+            setTimeout(() => setShake(false), 500);
+            return;
+          }
+        } catch (fetchError) {
+          if (retries === 1) {
+            setErrors({ form: "Server error. Please try again later." });
+            return;
+          }
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        retries--;
+      }
+
       if (!res.ok) {
         setErrors({ form: data.message || "Invalid credentials" });
         setShake(true);

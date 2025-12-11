@@ -1,18 +1,48 @@
 // routes/ping.js
-import express from "express";
-import { getConnection } from "../db.js"; // or however you get the DB connection
+const express = require("express");
+const { hydrologyDB, usersDB } = require("../db");
 
 const router = express.Router();
 
+// Health check endpoint - lightweight ping
 router.get("/", async (req, res) => {
   try {
-    const conn = await getConnection(); // use your method to connect
-    const [rows] = await conn.query("SELECT 1"); // lightweight query
-    res.status(200).json({ message: "Ping successful", data: rows });
+    // Quick database connectivity check
+    await hydrologyDB.query("SELECT 1");
+    res.status(200).json({ 
+      message: "Ping successful", 
+      timestamp: new Date().toISOString(),
+      status: "healthy"
+    });
   } catch (error) {
     console.error("Ping error:", error.message);
-    res.status(500).json({ error: "Ping failed" });
+    res.status(500).json({ error: "Ping failed", message: error.message });
   }
 });
 
-export default router;
+// Health check with database test
+router.get("/health", async (req, res) => {
+  try {
+    // Test both databases
+    await hydrologyDB.query("SELECT 1");
+    await usersDB.query("SELECT 1");
+    res.status(200).json({ 
+      message: "Health check passed", 
+      timestamp: new Date().toISOString(),
+      status: "healthy",
+      databases: {
+        hydrology: "connected",
+        users: "connected"
+      }
+    });
+  } catch (error) {
+    console.error("Health check error:", error.message);
+    res.status(500).json({ 
+      error: "Health check failed", 
+      message: error.message,
+      status: "unhealthy"
+    });
+  }
+});
+
+module.exports = router;

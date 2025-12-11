@@ -28,6 +28,21 @@ export default function Login() {
     setFormData({ ...formData, [name]: value });
   };
 
+  // Pre-wake backend to prevent sleep issues
+  const wakeBackend = async () => {
+    try {
+      await fetch("https://hydrology-jpvl.onrender.com/api/ping", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+      // Wait a moment for server to fully wake up
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (err) {
+      // Silently continue - this is just a wake-up ping
+      console.debug("Backend wake-up ping failed (continuing anyway):", err.message);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -39,6 +54,9 @@ export default function Login() {
     setIsLoading(true);
 
     try {
+      // Pre-wake backend before login to prevent sleep issues
+      await wakeBackend();
+
       if (isFirstLogin) {
         // First login → update password
         const res = await fetch("https://hydrology-jpvl.onrender.com/api/users/update-password", {
@@ -57,18 +75,38 @@ export default function Login() {
         alert("Password updated successfully. Please log in now.");
         setIsFirstLogin(false);
       } else {
-        // Normal login
-        const res = await fetch("https://hydrology-jpvl.onrender.com/api/users/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: formData.email,
-            password: formData.password,
-            role: formData.role,
-          }),
-        });
+        // Normal login - retry once if first attempt fails (server might be waking up)
+        let res;
+        let data;
+        let retries = 2;
+        
+        while (retries > 0) {
+          try {
+            res = await fetch("https://hydrology-jpvl.onrender.com/api/users/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                email: formData.email,
+                password: formData.password,
+                role: formData.role,
+              }),
+            });
 
-        const data = await res.json();
+            data = await res.json();
+            if (res.ok) break; // Success, exit retry loop
+            
+            // If not a server error, don't retry
+            if (res.status !== 500 && res.status !== 503) {
+              throw new Error(data.message || "Login failed");
+            }
+          } catch (fetchError) {
+            if (retries === 1) throw fetchError; // Last retry failed
+            // Wait before retry
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+          retries--;
+        }
+
         if (!res.ok) throw new Error(data.message || "Login failed");
 
         // ✅ Save token and user details in localStorage
