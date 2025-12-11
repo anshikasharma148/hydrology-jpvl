@@ -96,14 +96,19 @@ const CustomTooltip = ({ active, payload, label }) => {
         <div className="flex justify-between items-center mb-2">
           <p className="font-bold text-lg text-blue-700">🕒 {label}</p>
           <p className="text-xs font-semibold text-gray-500">
-            {new Date(data.rawTimestamp).toLocaleString('en-IN', {
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-              hour12: true,
-              day: '2-digit',
-              month: 'short',
-            })}
+            {(() => {
+              // Remove the timezone indicator "Z" so browser doesn't convert UTC → local time.
+              const clean = data.rawTimestamp ? data.rawTimestamp.replace("Z", "") : null;
+              const d = clean ? new Date(clean) : new Date();
+              return d.toLocaleString('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true,
+                day: '2-digit',
+                month: 'short',
+              });
+            })()}
           </p>
         </div>
         <div className="h-px bg-gradient-to-r from-blue-200 via-gray-300 to-blue-200 mb-3" />
@@ -186,23 +191,28 @@ else if (stationKey === 'vasudhara') stationArr = json.data.Vasudhara;
 
         const filtered = stationArr.filter((item) => new Date(item.timestamp) >= startOfDay);
 
-        const formatted = filtered.map((d) => ({
-          time: new Date(d.timestamp).toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true,
-          }),
-          rawTimestamp: d.timestamp,
-          Temperature: parseFloat(d.temperature) || 0,
-          Pressure: parseFloat(d.pressure) || 0,
-          Humidity: parseFloat(d.relative_humidity) || 0,
-          Rain: parseFloat(d.rain) || 0,
-          Precipitation: parseFloat(d.precipitation) || 0,
-          'Solar Radiation': parseFloat(d.PIR) || 0,
-          'Avg Solar Radiation': parseFloat(d.avg_PIR) || 0,
-          Wind: parseFloat(d.windspeed) || 0,
-          'Bucket Weight': parseFloat(d.bucket_weight) || 0,
-        }));
+        const formatted = filtered.map((d) => {
+          // Remove the timezone indicator "Z" so browser doesn't convert UTC → local time.
+          const clean = d.timestamp ? d.timestamp.replace("Z", "") : null;
+          const date = clean ? new Date(clean) : new Date();
+          return {
+            time: date.toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true,
+            }),
+            rawTimestamp: d.timestamp,
+            Temperature: parseFloat(d.temperature) || 0,
+            Pressure: parseFloat(d.pressure) || 0,
+            Humidity: parseFloat(d.relative_humidity) || 0,
+            Rain: parseFloat(d.rain) || 0,
+            Precipitation: parseFloat(d.precipitation) || 0,
+            'Solar Radiation': parseFloat(d.PIR) || 0,
+            'Avg Solar Radiation': parseFloat(d.avg_PIR) || 0,
+            Wind: parseFloat(d.windspeed) || 0,
+            'Bucket Weight': parseFloat(d.bucket_weight) || 0,
+          };
+        });
 
         setData(formatted);
 
@@ -241,12 +251,16 @@ else if (stationKey === 'vasudhara') stationArr = json.data.Vasudhara;
     );
   };
 
-  const formattedDate = currentTime.toLocaleDateString('en-GB', {
+  // Remove the timezone indicator "Z" so browser doesn't convert UTC → local time.
+  const cleanTimestamp = liveData?.timestamp ? liveData.timestamp.replace("Z", "") : null;
+  const displayTime = cleanTimestamp ? new Date(cleanTimestamp) : currentTime;
+  
+  const formattedDate = displayTime.toLocaleDateString('en-GB', {
     weekday: 'long',
     day: '2-digit',
     month: 'long',
   });
-  const formattedTime = currentTime.toLocaleTimeString('en-US', {
+  const formattedTime = displayTime.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: true,

@@ -212,7 +212,9 @@ export default function TrendsPage() {
 
       if (start && end) {
         formattedData = formattedData.filter((d) => {
-          const ts = new Date(d.timestamp);
+          // Remove the timezone indicator "Z" so browser doesn't convert UTC → local time.
+          const clean = d.timestamp ? d.timestamp.replace("Z", "") : null;
+          const ts = clean ? new Date(clean) : new Date();
           return ts >= start && ts <= end;
         });
       }
@@ -315,12 +317,15 @@ export default function TrendsPage() {
 
   // CHART OPTIONS - Stock Market Style
   const getChartOption = (key, label, unit, colorIndex) => {
-    const times = data.map((d) =>
-      new Date(d.timestamp).toLocaleTimeString([], {
+    const times = data.map((d) => {
+      // Remove the timezone indicator "Z" so browser doesn't convert UTC → local time.
+      const clean = d.timestamp ? d.timestamp.replace("Z", "") : null;
+      const date = clean ? new Date(clean) : new Date();
+      return date.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
-      })
-    );
+      });
+    });
 
     const values = data.map((d) => d[key]);
     const stats = getStats(key);
@@ -376,7 +381,10 @@ export default function TrendsPage() {
           if (!params || params.length === 0) return '';
           const param = params[0];
           const dataIndex = param.dataIndex;
-          const date = data[dataIndex]?.timestamp ? new Date(data[dataIndex].timestamp).toLocaleString() : '';
+          const timestamp = data[dataIndex]?.timestamp;
+          // Remove the timezone indicator "Z" so browser doesn't convert UTC → local time.
+          const clean = timestamp ? timestamp.replace("Z", "") : null;
+          const date = clean ? new Date(clean).toLocaleString() : '';
           let result = `<div style="margin-bottom: 5px; font-weight: bold; border-bottom: 1px solid ${color}; padding-bottom: 5px;">${date}</div>`;
           params.forEach(p => {
             const value = p.value !== null && p.value !== undefined ? p.value.toFixed(2) : 'N/A';

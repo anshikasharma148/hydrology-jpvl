@@ -32,7 +32,25 @@ const CustomTooltip = ({ active, payload, label }) => {
   };
 
   const formatTimestamp = (ts) => {
-    const d = new Date(ts);
+    if (!ts) return "--";
+    // Handle different timestamp types (string, number, Date)
+    let clean;
+    if (typeof ts === 'string') {
+      // Remove the timezone indicator "Z" so browser doesn't convert UTC → local time.
+      clean = ts.replace("Z", "");
+    } else if (typeof ts === 'number') {
+      // If it's a number (timestamp in ms), use it directly
+      clean = ts;
+    } else if (ts instanceof Date) {
+      // If it's already a Date object, use it directly
+      clean = ts;
+    } else {
+      clean = ts;
+    }
+    // Create date as if the timestamp is already local sensor time
+    const d = new Date(clean);
+    if (isNaN(d.getTime())) return "--";
+    
     const day = d.getDate().toString().padStart(2, "0");
     const mon = (d.getMonth() + 1).toString().padStart(2, "0");
     const yr = d.getFullYear().toString().slice(-2);
@@ -167,7 +185,9 @@ export default function StationGraph({ station }) {
       }
 
       let filtered = raw.filter((e) => {
-        const t = new Date(e.timestamp);
+        // Remove the timezone indicator "Z" so browser doesn't convert UTC → local time.
+        const clean = e.timestamp && typeof e.timestamp === 'string' ? e.timestamp.replace("Z", "") : e.timestamp;
+        const t = new Date(clean);
 
         if (days === 2) {
           let start = new Date();
@@ -192,7 +212,12 @@ export default function StationGraph({ station }) {
           avgSurfaceVelocity: Number(e.avg_surface_velocity),
           discharge: Number(e.water_discharge),
         }))
-        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+        .sort((a, b) => {
+          // Remove the timezone indicator "Z" so browser doesn't convert UTC → local time.
+          const cleanA = a.timestamp && typeof a.timestamp === 'string' ? a.timestamp.replace("Z", "") : a.timestamp;
+          const cleanB = b.timestamp && typeof b.timestamp === 'string' ? b.timestamp.replace("Z", "") : b.timestamp;
+          return new Date(cleanA) - new Date(cleanB);
+        });
 
       setGraphData(formatted);
     } catch (err) {
@@ -210,7 +235,22 @@ export default function StationGraph({ station }) {
   }, [station, days]);
 
   const formatXAxisTick = (ts) => {
-    const d = new Date(ts);
+    // Handle different timestamp types (string, number, Date)
+    let clean;
+    if (typeof ts === 'string') {
+      // Remove the timezone indicator "Z" so browser doesn't convert UTC → local time.
+      clean = ts.replace("Z", "");
+    } else if (typeof ts === 'number') {
+      // If it's a number (timestamp in ms), use it directly
+      clean = ts;
+    } else if (ts instanceof Date) {
+      // If it's already a Date object, use it directly
+      clean = ts;
+    } else {
+      clean = ts;
+    }
+    // Create date as if the timestamp is already local sensor time
+    const d = new Date(clean);
 
     if (days <= 2) {
       let hr = d.getHours();

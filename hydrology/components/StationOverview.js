@@ -103,7 +103,10 @@ export default function StationOverview({ station, liveData }) {
   const stationDisplay = station.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   const stateName = stationStates[station] || 'Uttarakhand';
   const temperature = tempUnit === 'C' ? Math.round(weather.temperature) : Math.round((weather.temperature * 9 / 5) + 32);
-  const date = new Date(weather.timestamp || new Date());
+  
+  // Remove the timezone indicator "Z" so browser doesn't convert UTC → local time.
+  const cleanTimestamp = weather.timestamp ? weather.timestamp.replace("Z", "") : null;
+  const date = cleanTimestamp ? new Date(cleanTimestamp) : new Date();
   const formattedDate = date.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long' });
   const formattedTime = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true });
   const coordinates = stationCoordinates[station] || { lat: 'N/A', long: 'N/A' };

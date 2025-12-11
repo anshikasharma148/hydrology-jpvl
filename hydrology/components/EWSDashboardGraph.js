@@ -62,32 +62,33 @@ const WaterTrends = () => {
     const merged = {};
 
     const now = new Date();
-    const nowIST = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
-
-    const cutoffDateIST = new Date(nowIST);
+    const cutoffDateIST = new Date(now);
     cutoffDateIST.setHours(0, 0, 0, 0);
     cutoffDateIST.setDate(cutoffDateIST.getDate() - (days - 1));
 
     Object.keys(data).forEach(station => {
       data[station]?.forEach(item => {
+        // REMOVE "Z" so browser does not convert UTC → local time
+        const clean = item.timestamp?.replace("Z", "");
+        // Interpret timestamp exactly as sensor time
+        const tsSensor = clean ? new Date(clean) : new Date();
 
-        const tsUTC = new Date(item.timestamp);
-        const tsIST = new Date(tsUTC.getTime() + 5.5 * 60 * 60 * 1000);
+        if (tsSensor < cutoffDateIST) return;
 
-        if (tsIST < cutoffDateIST) return;
+        // Format time using the same function
+        const timeString = formatISTTime(tsSensor);
 
-        const timeString = formatISTTime(tsIST);
-
-        const day = String(tsIST.getDate()).padStart(2, '0');
-        const month = String(tsIST.getMonth() + 1).padStart(2, '0');
-        const year = tsIST.getFullYear();
+        // Build date
+        const day = String(tsSensor.getDate()).padStart(2, '0');
+        const month = String(tsSensor.getMonth() + 1).padStart(2, '0');
+        const year = tsSensor.getFullYear();
         const dateString = `${day}/${month}/${year}`;
 
         if (!merged[timeString]) {
           merged[timeString] = {
             time: timeString,
             fullDate: dateString,
-            timestamp: tsIST.toISOString()
+            timestamp: tsSensor.toISOString()
           };
         }
 
@@ -161,12 +162,12 @@ const WaterTrends = () => {
   };
 
   /* Render single station chart */
-  const renderStationChart = (stationName, dataKeySuffix, title, color, unit) => {
+  const renderStationChart = (stationName, dataKeySuffix, title, color, unit, key) => {
     const stationData = getStationData(stationName, dataKeySuffix);
     const displayName = stationName.charAt(0).toUpperCase() + stationName.slice(1);
 
     return (
-      <div className="w-full md:w-[48%] mb-6 relative">
+      <div key={key} className="w-full md:w-[48%] mb-6 relative">
         <div className={`absolute inset-0 rounded-2xl blur-xl -z-10 ${
           isDarkMode ? "bg-gradient-to-br from-slate-800/10 to-blue-900/10"
                       : "bg-gradient-to-br from-blue-100/10 to-blue-200/10"
@@ -261,7 +262,8 @@ const WaterTrends = () => {
               dataKeySuffix,
               title,
               colors[index % colors.length],
-              unit
+              unit,
+              `${station}-${dataKeySuffix}-${index}`
             )
           )}
         </div>

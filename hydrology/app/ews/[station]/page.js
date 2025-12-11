@@ -58,9 +58,33 @@ export default function StationPage() {
         const arr = json?.data?.[key] || [];
 
         if (arr.length > 0) {
-          const latest = arr.reduce((a, b) =>
-            new Date(b.timestamp) > new Date(a.timestamp) ? b : a
-          );
+          // Find latest record by timestamp
+          const latestRecord = arr.reduce((latest, current) => {
+            const latestTime = new Date(latest.timestamp || 0).getTime();
+            const currentTime = new Date(current.timestamp || 0).getTime();
+            return currentTime > latestTime ? current : latest;
+          }, arr[0]);
+          
+          // Find candidate with valid data
+          const candidate = arr.find((r) =>
+            [r.water_level, r.avg_surface_velocity, r.surface_velocity, r.water_dist_sensor, r.water_discharge, r.tilt_angle, r.flow_direction]
+              .some((x) => x !== null && x !== undefined && x !== "")
+          ) || latestRecord;
+          
+          // Fix Mana timestamp format if needed
+          const fixManaTimestamp = (ts) => {
+            if (!ts) return null;
+            if (station === "mana" && ts.includes(" ") && !ts.includes("T")) {
+              return ts.replace(" ", "T") + "Z";
+            }
+            return ts;
+          };
+          
+          // Use candidate timestamp (same record as data), fallback to latestRecord if missing
+          const latest = {
+            ...candidate,
+            timestamp: fixManaTimestamp(candidate.timestamp) ?? fixManaTimestamp(latestRecord.timestamp),
+          };
           setLatestData(latest);
         }
       } catch (err) {

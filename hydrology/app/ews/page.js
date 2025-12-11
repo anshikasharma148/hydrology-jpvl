@@ -46,7 +46,46 @@ export default function EWSPage() {
         });
 
         const json = await res.json();
-        setLiveStations(json?.data || {});
+        
+        // Process data to ensure timestamp matches the candidate record used for data
+        const processedData = {};
+        if (json?.data) {
+          Object.entries(json.data).forEach(([station, arr]) => {
+            if (Array.isArray(arr) && arr.length > 0) {
+              // Find latest record by timestamp
+              const latestRecord = arr.reduce((latest, current) => {
+                const latestTime = new Date(latest.timestamp || 0).getTime();
+                const currentTime = new Date(current.timestamp || 0).getTime();
+                return currentTime > latestTime ? current : latest;
+              }, arr[0]);
+              
+              // Find candidate with valid data
+              const candidate = arr.find((r) =>
+                [r.water_level, r.avg_surface_velocity, r.surface_velocity, r.water_dist_sensor, r.water_discharge, r.tilt_angle, r.flow_direction]
+                  .some((x) => x !== null && x !== undefined && x !== "")
+              ) || latestRecord;
+              
+              // Fix Mana timestamp format if needed
+              const fixManaTimestamp = (ts) => {
+                if (!ts) return null;
+                if (station === "Mana" && ts.includes(" ") && !ts.includes("T")) {
+                  return ts.replace(" ", "T") + "Z";
+                }
+                return ts;
+              };
+              
+              // Use candidate timestamp (same record as data), fallback to latestRecord if missing
+              processedData[station] = [{
+                ...candidate,
+                timestamp: fixManaTimestamp(candidate.timestamp) ?? fixManaTimestamp(latestRecord.timestamp),
+              }];
+            } else {
+              processedData[station] = arr;
+            }
+          });
+        }
+        
+        setLiveStations(processedData);
 
       } catch (err) {
         console.error("Fetch error:", err);
@@ -93,7 +132,12 @@ export default function EWSPage() {
 
   const formattedTime = (ts) => {
     if (!ts) return "--";
-    return new Date(ts).toLocaleString("en-IN", {
+    // Remove the timezone indicator "Z" so browser doesn't convert UTC → local time.
+    const clean = ts.replace("Z", "");
+    // Create date as if the timestamp is already local sensor time
+    const d = new Date(clean);
+    if (isNaN(d.getTime())) return "--";
+    return d.toLocaleString("en-IN", {
       hour: "2-digit",
       minute: "2-digit",
       hour12: true,

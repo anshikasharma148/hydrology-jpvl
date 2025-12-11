@@ -95,7 +95,15 @@ export default function Dashboard() {
 
       const normalize = (name, arr) => {
         if (!arr || !Array.isArray(arr) || arr.length === 0) return null;
-        const latest = arr[0];
+        
+        // Ensure we get the absolute latest record by checking all timestamps
+        const latest = arr.reduce((latest, current) => {
+          const latestTime = new Date(latest.timestamp || 0).getTime();
+          const currentTime = new Date(current.timestamp || 0).getTime();
+          return currentTime > latestTime ? current : latest;
+        }, arr[0]);
+        
+        // AWS uses latest record for both data and timestamp (no candidate mismatch)
         return {
           station: name,
           device: DEVICE_MAP[name]?.device ?? null,
@@ -110,7 +118,7 @@ export default function Dashboard() {
           bucketWeight: safeParse(latest.bucket_weight),
           PIR: safeParse(latest.PIR),
           avgPIR: safeParse(latest.avg_PIR ?? latest.avg_PIR ?? latest.avg_PIR),
-          timestamp: latest.timestamp ?? null,
+          timestamp: latest.timestamp,
           raw: latest,
         };
       };
@@ -146,11 +154,20 @@ export default function Dashboard() {
       // Vasudhara
       if (json?.data?.Vasudhara && Array.isArray(json.data.Vasudhara) && json.data.Vasudhara.length) {
         const arr = json.data.Vasudhara;
+        
+        // Ensure arr[0] is truly the latest by checking timestamps
+        const latestRecord = arr.reduce((latest, current) => {
+          const latestTime = new Date(latest.timestamp || 0).getTime();
+          const currentTime = new Date(current.timestamp || 0).getTime();
+          return currentTime > latestTime ? current : latest;
+        }, arr[0]);
+        
         const candidate = arr.find((r) =>
           [r.water_level, r.avg_surface_velocity, r.surface_velocity, r.water_dist_sensor, r.water_discharge, r.tilt_angle, r.flow_direction]
             .some((x) => x !== null && x !== undefined && x !== "")
-        ) || arr[0];
+        ) || latestRecord;
 
+        // Use candidate timestamp (same record as data), fallback to latestRecord if missing
         vasudharaNorm = {
           StationID: candidate.StationID ?? null,
           DeviceID: candidate.DeviceID ?? null,
@@ -166,46 +183,72 @@ export default function Dashboard() {
           absorbed_current: safeParse(candidate.observed_current),
           battery_voltage: safeParse(candidate.battery_voltage),
           solar_panel_tracking: safeParse(candidate.solar_panel_tracking),
-          timestamp: candidate.timestamp ?? null,
+          timestamp: candidate.timestamp ?? latestRecord.timestamp,
           UID: candidate.UID ?? null,
           raw: candidate,
         };
       }
 
-      // Mana (new)
+      // Mana (new) - TEMPORARILY SHOW AS OFFLINE
+      // TODO: Remove timestamp override when Mana starts receiving data
       if (json?.data?.Mana && Array.isArray(json.data.Mana) && json.data.Mana.length) {
         const arrM = json.data.Mana;
+        
+        // Ensure we get the absolute latest record by checking all timestamps
+        const latestRecordM = arrM.reduce((latest, current) => {
+          const latestTime = new Date(latest.timestamp || 0).getTime();
+          const currentTime = new Date(current.timestamp || 0).getTime();
+          return currentTime > latestTime ? current : latest;
+        }, arrM[0]);
+        
         const candidateM = arrM.find((r) =>
           [r.water_level, r.avg_surface_velocity, r.surface_velocity, r.water_dist_sensor, r.water_discharge, r.tilt_angle, r.flow_direction]
             .some((x) => x !== null && x !== undefined && x !== "")
-        ) || arrM[0];
+        ) || latestRecordM;
 
         // Fix Mana timestamp ONLY (MySQL → ISO)
-const fixManaTimestamp = (ts) => {
-  if (!ts) return null;
-  if (ts.includes(" ") && !ts.includes("T")) {
-    return ts.replace(" ", "T") + "Z"; // convert to ISO
-  }
-  return ts;
-};
+        const fixManaTimestamp = (ts) => {
+          if (!ts) return null;
+          if (ts.includes(" ") && !ts.includes("T")) {
+            return ts.replace(" ", "T") + "Z"; // convert to ISO
+          }
+          return ts;
+        };
 
-manaNorm = {
-  StationID: candidateM.StationID ?? null,
-  DeviceID: candidateM.DeviceID ?? null,
-  surface_velocity: safeParse(candidateM.surface_velocity),
-  avg_surface_velocity: safeParse(candidateM.avg_surface_velocity),
-  water_dist_sensor: safeParse(candidateM.water_dist_sensor),
-  water_level: safeParse(candidateM.water_level),
-  water_discharge: safeParse(candidateM.water_discharge),
-  tilt_angle: safeParse(candidateM.tilt_angle),
-  flow_direction: safeParse(candidateM.flow_direction),
-  SNR: safeParse(candidateM.SNR),
-  timestamp: fixManaTimestamp(candidateM.timestamp),
-  UID: candidateM.UID ?? null,
-  raw: candidateM,
-};
-
-
+        // Use candidateM timestamp (same record as data), fallback to latestRecordM if missing
+        // TEMPORARILY: Set timestamp to null to show as Offline
+        manaNorm = {
+          StationID: candidateM.StationID ?? null,
+          DeviceID: candidateM.DeviceID ?? null,
+          surface_velocity: safeParse(candidateM.surface_velocity),
+          avg_surface_velocity: safeParse(candidateM.avg_surface_velocity),
+          water_dist_sensor: safeParse(candidateM.water_dist_sensor),
+          water_level: safeParse(candidateM.water_level),
+          water_discharge: safeParse(candidateM.water_discharge),
+          tilt_angle: safeParse(candidateM.tilt_angle),
+          flow_direction: safeParse(candidateM.flow_direction),
+          SNR: safeParse(candidateM.SNR),
+          timestamp: null, // TEMPORARILY set to null to show as Offline - TODO: Change to: fixManaTimestamp(candidateM.timestamp) ?? fixManaTimestamp(latestRecordM.timestamp)
+          UID: candidateM.UID ?? null,
+          raw: candidateM,
+        };
+      } else {
+        // If no data, create empty data object with null timestamp to show card as Offline
+        manaNorm = {
+          StationID: null,
+          DeviceID: null,
+          surface_velocity: null,
+          avg_surface_velocity: null,
+          water_dist_sensor: null,
+          water_level: null,
+          water_discharge: null,
+          tilt_angle: null,
+          flow_direction: null,
+          SNR: null,
+          timestamp: null, // This will show as Offline
+          UID: null,
+          raw: null,
+        };
       }
 
       setEwsLatest({ Vasudhara: vasudharaNorm, Mana: manaNorm });
@@ -247,16 +290,23 @@ manaNorm = {
   // format date/time as "24 Nov 2025, 12:30 PM" (no device id)
   const formatDateTime = (ts) => {
     if (!ts) return null;
-    const d = parseUTC(ts);
-    if (!d) return null;
-    return d.toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
+    // Remove the timezone indicator "Z" so browser doesn't convert UTC → local time.
+    const clean = ts.replace("Z", "");
+    // Create date as if the timestamp is already local sensor time
+    const d = new Date(clean);
+    if (isNaN(d.getTime())) {
+      console.warn("Failed to parse timestamp:", ts);
+      return null;
+    }
+    const year = d.getFullYear();
+    const month = d.toLocaleString("en-GB", { month: "short" });
+    const day = String(d.getDate()).padStart(2, "0");
+    let hour = d.getHours();
+    const minute = String(d.getMinutes()).padStart(2, "0");
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const hour12 = hour % 12 || 12;
+    
+    return `${day} ${month} ${year}, ${hour12}:${minute} ${ampm}`;
   };
 
   // the unified live badge (blinking style as you asked)

@@ -75,32 +75,55 @@ const displayNames = {
   Vasudhara: 'Vasudhara',
 };
 
-// IST Conversion
-const toISTDateString = (ts) => {
-  const d = new Date(ts).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' });
-  const dt = new Date(d);
-  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(
-    dt.getDate()
+/* NEW: Treat timestamp as sensor-local time */
+const toSensorDate = (ts) => {
+  if (!ts) return null;
+  const clean = typeof ts === "string" ? ts.replace("Z", "") : ts;
+  const d = new Date(clean);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+const toSensorDateString = (ts) => {
+  const d = toSensorDate(ts);
+  if (!d) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+    d.getDate()
   ).padStart(2, '0')}`;
 };
-const toISTDateTime = (ts) =>
-  new Date(new Date(ts).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
 
-const formatTime = (ts) =>
-  new Date(ts).toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
+const formatTime = (ts) => {
+  if (!ts) return "--";
+
+  let clean;
+  if (typeof ts === "string") clean = ts.replace("Z", "");
+  else clean = ts;
+
+  const d = new Date(clean);
+  if (isNaN(d.getTime())) return "--";
+
+  return d.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
     hour12: true,
-    timeZone: 'Asia/Kolkata',
   });
+};
 
-const formatDate = (ts) =>
-  new Date(ts).toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'Asia/Kolkata',
+const formatDate = (ts) => {
+  if (!ts) return "--";
+
+  let clean;
+  if (typeof ts === "string") clean = ts.replace("Z", "");
+  else clean = ts;
+
+  const d = new Date(clean);
+  if (isNaN(d.getTime())) return "--";
+
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
+};
 
 const formatDateTime = (ts) => {
   const date = formatDate(ts);
@@ -212,7 +235,8 @@ export default function ParameterGraphs() {
         ];
 
         // date filter
-        const now = toISTDateTime(new Date().toISOString());
+        const now = toSensorDate(new Date().toISOString());
+        if (!now) return {};
         const allowed = new Set();
         for (let i = 0; i < days; i++) {
           const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
@@ -242,10 +266,12 @@ export default function ParameterGraphs() {
         stations.forEach((st) => {
           if (!st.key) return;
           obj[st.key].forEach((row) => {
-            const ds = toISTDateString(row.timestamp);
-            if (!allowed.has(ds)) return;
+            const ds = toSensorDateString(row.timestamp);
+            if (!ds || !allowed.has(ds)) return;
 
-            const t = toISTDateTime(row.timestamp).getTime();
+            const d = toSensorDate(row.timestamp);
+            if (!d) return;
+            const t = d.getTime();
             if (!merged[t]) merged[t] = { time: t };
 
             Object.entries(map).forEach(([param, key]) => {

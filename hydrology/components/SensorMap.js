@@ -25,7 +25,27 @@ L.Icon.Default.mergeOptions({
   shadowUrl: require("leaflet/dist/images/marker-shadow.png").default,
 });
 
-const formatTS = (ts) => (ts ? new Date(ts).toLocaleString() : "---");
+const formatTS = (ts) => {
+  if (!ts) return "---";
+  // Handle different timestamp types (string, number, Date)
+  let clean;
+  if (typeof ts === 'string') {
+    // Remove the timezone indicator "Z" so browser doesn't convert UTC → local time.
+    clean = ts.replace("Z", "");
+  } else if (typeof ts === 'number') {
+    // If it's a number (timestamp in ms), use it directly
+    clean = ts;
+  } else if (ts instanceof Date) {
+    // If it's already a Date object, use it directly
+    clean = ts;
+  } else {
+    clean = ts;
+  }
+  // Create date as if the timestamp is already local sensor time
+  const d = new Date(clean);
+  if (isNaN(d.getTime())) return "---";
+  return d.toLocaleString();
+};
 const dmsToDecimal = (d, m, s) => d + m / 60 + s / 3600;
 
 // Animated River Layer
@@ -125,7 +145,7 @@ const FreshSensorMap = () => {
       }
 
       // EWS
-      const ewsRes = await fetch("hhttps://hydrology-jpvl.onrender.com/api/ews-live/all");
+      const ewsRes = await fetch("https://hydrology-jpvl.onrender.com/api/ews-live/all");
       const ewsJson = await ewsRes.json();
       const ewsFinal = {};
       if (ewsJson?.data) {
