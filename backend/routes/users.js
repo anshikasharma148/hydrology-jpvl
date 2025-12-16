@@ -8,6 +8,7 @@ const router = express.Router();
 // Helper function to get client IP address
 const getClientIP = async (req) => {
   // First, try to get IP from headers (works when behind proxy/load balancer)
+  // x-forwarded-for contains the original client IP when behind proxy
   let ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
            req.headers['x-real-ip'] ||
            req.connection?.remoteAddress ||
@@ -15,10 +16,30 @@ const getClientIP = async (req) => {
            req.ip ||
            null;
 
-  // If IP is localhost/127.0.0.1, try to get public IP from external service
-  if (!ip || ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) {
+  // Clean up IP (remove IPv6 prefix if present)
+  if (ip && ip.startsWith('::ffff:')) {
+    ip = ip.replace('::ffff:', '');
+  }
+
+  // If IP is localhost/private IP and we're testing locally, 
+  // the request is coming from the same machine, so we can't get the actual user's IP
+  // In production, x-forwarded-for should contain the real client IP
+  if (!ip || ip === '127.0.0.1' || ip === '::1' || ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) {
+    // Check if we have x-forwarded-for with a real IP (shouldn't happen for localhost, but check anyway)
+    const forwardedFor = req.headers['x-forwarded-for'];
+    if (forwardedFor) {
+      const ips = forwardedFor.split(',').map(i => i.trim());
+      const realIP = ips.find(i => i && i !== '127.0.0.1' && !i.startsWith('192.168.') && !i.startsWith('10.') && !i.startsWith('172.'));
+      if (realIP) {
+        console.log(`[IP Detection] Found real client IP in x-forwarded-for: ${realIP}`);
+        return realIP;
+      }
+    }
+    
+    // If still localhost/private, and we're testing locally, try to get server's public IP
+    // This is a fallback - in production, x-forwarded-for should always have the real client IP
+    console.warn('[IP Detection] Localhost/private IP detected. Attempting to get public IP as fallback.');
     try {
-      // Try to get public IP from external service
       const https = require('https');
       const publicIP = await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error('Timeout')), 2000);
@@ -29,6 +50,7 @@ const getClientIP = async (req) => {
             clearTimeout(timeout);
             try {
               const json = JSON.parse(data);
+              console.log(`[IP Detection] Using server's public IP as fallback: ${json.ip}`);
               resolve(json.ip);
             } catch (e) {
               reject(e);
@@ -41,12 +63,12 @@ const getClientIP = async (req) => {
       });
       return publicIP || ip || 'Unknown';
     } catch (error) {
-      // If external service fails, return the original IP or 'Unknown'
       console.warn('[IP Detection] Failed to get public IP:', error.message);
       return ip || 'Unknown';
     }
   }
 
+  console.log(`[IP Detection] Using client IP: ${ip}`);
   return ip;
 };
 
