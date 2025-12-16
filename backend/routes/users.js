@@ -160,26 +160,20 @@ router.post("/login", async (req, res) => {
 
     const dbUser = user[0];
     
-    // Security: If user selects "admin" role, verify they are actually an admin
-    if (role && role.toLowerCase() === 'admin') {
-      // Check if user is actually an admin
-      if (!dbUser.role || dbUser.role.toLowerCase() !== 'admin') {
-        // Non-admin trying to log in as admin - reject
-        const fullName = `${dbUser.first_name || ''} ${dbUser.last_name || ''}`.trim() || 'Unknown';
-        await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, 'user', 'failed');
-        return res.status(403).json({ error: "Access denied. You are not an admin." });
-      }
-      // User is admin and selected admin role - allow, but log as admin login
-      // Continue to password check below
-    } else {
-      // User selected non-admin role - verify they are not an admin
-      if (dbUser.role && dbUser.role.toLowerCase() === 'admin') {
-        // Admin trying to use regular login without selecting admin role - reject
-        const fullName = `${dbUser.first_name || ''} ${dbUser.last_name || ''}`.trim() || 'Unknown';
-        await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, 'user', 'failed');
-        return res.status(403).json({ error: "Admins must select 'Admin' role to login" });
-      }
-      // Regular user with regular role - allow
+    // Security: Validate that the selected role exactly matches the user's actual role in database
+    const selectedRole = role ? role.trim() : '';
+    const actualRole = dbUser.role ? dbUser.role.trim() : '';
+    
+    // Normalize roles for comparison (case-insensitive)
+    const selectedRoleLower = selectedRole.toLowerCase();
+    const actualRoleLower = actualRole.toLowerCase();
+    
+    // Strict role validation: selected role must match actual role
+    if (selectedRoleLower !== actualRoleLower) {
+      const fullName = `${dbUser.first_name || ''} ${dbUser.last_name || ''}`.trim() || 'Unknown';
+      console.log(`[LOGIN] Role mismatch. Selected: "${selectedRole}", Actual: "${actualRole}"`);
+      await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, 'user', 'failed');
+      return res.status(403).json({ error: `Access denied. Your role is "${actualRole}", but you selected "${selectedRole}". Please select the correct role.` });
     }
     
     let validPass = false;
