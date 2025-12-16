@@ -103,6 +103,19 @@ export default function AdminHome() {
               </div>
             </a>
 
+            {/* Station Status Management */}
+            <a href="/admin/station-status" className="flex items-center p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-indigo-50 hover:shadow-md transform hover:scale-[1.02] transition-all duration-200 group">
+              <div className="flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 bg-indigo-100 rounded-lg mr-3 sm:mr-4 group-hover:bg-indigo-200 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="font-medium text-gray-700 text-sm sm:text-base group-hover:text-indigo-600">Station Status</h2>
+                <p className="text-xs sm:text-sm text-gray-500">Manage station status (Live/Offline/Maintenance)</p>
+              </div>
+            </a>
+
             {/* Settings */}
             <a href="/admin/settings" className="flex items-center p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-indigo-50 hover:shadow-md transform hover:scale-[1.02] transition-all duration-200 group">
               <div className="flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 bg-indigo-100 rounded-lg mr-3 sm:mr-4 group-hover:bg-indigo-200 transition">

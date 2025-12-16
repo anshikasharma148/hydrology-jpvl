@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import Navbar from "../../components/Navbar";
 import ParameterGraphs from "../../components/ParameterGraphs";
+import { useStationStatus } from "../../hooks/useStationStatus";
 import { 
   MapPin, 
   RefreshCw, 
@@ -170,6 +171,15 @@ export default function AwsPage() {
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [currentTheme, setCurrentTheme] = useState(getTimeBasedTheme());
+  const { getStationStatus } = useStationStatus();
+  
+  // Station ID mapping
+  const STATION_ID_MAP = {
+    "mana": "ST019",
+    "lambagad": "ST015",
+    "barrage": "ST015",
+    "vasudhara": "ST020",
+  };
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -389,11 +399,10 @@ export default function AwsPage() {
           stations.map((station, i) => {
             const displayName = displayNames[station.name] || station.name;
             const windDirectionText = getWindDirectionText(station.wind_direction);
-
-            const now = new Date();
-            const lastUpdateTime = new Date(station.lastUpdate);
-            const diffMinutes = (now - lastUpdateTime) / (1000 * 60);
-            const isLive = diffMinutes <= 20;
+            const stationId = STATION_ID_MAP[station.name.toLowerCase()] || null;
+            const statusInfo = getStationStatus(stationId, "AWS", station.lastUpdate, 20);
+            const isMaintenance = statusInfo.status === "maintenance";
+            const isLive = statusInfo.status === "live";
 
             return (
               <div
@@ -406,16 +415,18 @@ export default function AwsPage() {
                 {/* Shine effect on hover */}
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 pointer-events-none"></div>
 
-                {/* Live/Offline Badge with pulse ring */}
+                {/* Live/Offline/Maintenance Badge with pulse ring */}
                 <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-20">
                   <div className="relative">
-                    {isLive && (
+                    {isLive && !isMaintenance && (
                       <div className="absolute inset-0 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500 animate-ping opacity-75"></div>
                     )}
                   <div
-                      className={`relative w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shadow-lg ${
-                      isLive
-                          ? "bg-green-500 shadow-green-500/50"
+                    className={`relative w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shadow-lg ${
+                      isMaintenance
+                        ? "bg-yellow-500 shadow-yellow-500/50"
+                        : isLive
+                        ? "bg-green-500 shadow-green-500/50"
                         : "bg-red-500 shadow-red-500/50"
                     }`}
                   />

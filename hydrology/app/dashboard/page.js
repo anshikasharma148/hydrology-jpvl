@@ -5,6 +5,7 @@ import Navbar from "../../components/Navbar";
 import Sidebar from "../../components/Sidebar";
 import AddStationForm from "../../components/AddStationForm";
 import dynamic from "next/dynamic";
+import { useStationStatus } from "../../hooks/useStationStatus";
 import { ArrowLeft, Thermometer, Battery, BatteryCharging, Zap, Sun, Gauge, Droplets, Wind, Compass, Ruler, TrendingUp, Waves, ScanLine } from "lucide-react";
 import {
   FaTemperatureHigh,
@@ -47,6 +48,9 @@ export default function Dashboard() {
   // changed to hold multiple EWS stations
   const [ewsLatest, setEwsLatest] = useState({ Vasudhara: null, Mana: null });
   const [isDarkTheme, setIsDarkTheme] = useState(false);
+  
+  // Station status hook for manual status management
+  const { getStationStatus } = useStationStatus();
 
   // DEVICE + STATION ID mapping
   const DEVICE_MAP = {
@@ -310,8 +314,27 @@ export default function Dashboard() {
   };
 
   // the unified live badge (blinking style as you asked)
-  const LiveBadge = ({ timestamp, isDarkTheme, thresholdMin = 30 }) => {
-    if (!timestamp) {
+  // Updated to support manual status management
+  const LiveBadge = ({ timestamp, isDarkTheme, thresholdMin = 30, stationId, serviceType = "AWS" }) => {
+    // Get effective status (manual or auto-detected)
+    const statusInfo = getStationStatus(stationId, serviceType, timestamp, thresholdMin);
+    const { status, isManual, offlineTimestamp } = statusInfo;
+
+    // Maintenance status
+    if (status === "maintenance") {
+      const cls = isDarkTheme
+        ? "flex items-center bg-yellow-500/10 text-yellow-200 text-[11px] px-2 py-0.5 rounded-full font-semibold border border-yellow-400/30"
+        : "flex items-center bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full font-semibold border border-yellow-200";
+      return (
+        <div className={cls}>
+          <span className="w-2 h-2 bg-yellow-500 rounded-full mr-1" />
+          Under Maintenance
+        </div>
+      );
+    }
+
+    // Offline status
+    if (status === "offline") {
       const cls = isDarkTheme
         ? "flex items-center bg-red-500/10 text-red-200 text-[11px] px-2 py-0.5 rounded-full font-semibold border border-red-400/30"
         : "flex items-center bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full font-semibold border border-red-200";
@@ -323,34 +346,7 @@ export default function Dashboard() {
       );
     }
 
-    const parsed = Date.parse(timestamp);
-    if (isNaN(parsed)) {
-      const cls = isDarkTheme
-        ? "flex items-center bg-red-500/10 text-red-200 text-[11px] px-2 py-0.5 rounded-full font-semibold border border-red-400/30"
-        : "flex items-center bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full font-semibold border border-red-200";
-      return (
-        <div className={cls}>
-          <span className="w-2 h-2 bg-red-500 rounded-full mr-1" />
-          Invalid
-        </div>
-      );
-    }
-
-    const diffMin = (Date.now() - parsed) / (1000 * 60);
-    const live = diffMin <= thresholdMin;
-
-    if (!live) {
-      const cls = isDarkTheme
-        ? "flex items-center bg-red-500/10 text-red-200 text-[11px] px-2 py-0.5 rounded-full font-semibold border border-red-400/30"
-        : "flex items-center bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full font-semibold border border-red-200";
-      return (
-        <div className={cls}>
-          <span className="w-2 h-2 bg-red-500 rounded-full mr-1" />
-          Offline
-        </div>
-      );
-    }
-
+    // Live status
     const liveCls = isDarkTheme
       ? "flex items-center bg-emerald-500/10 text-emerald-200 text-[11px] px-2 py-0.5 rounded-full font-semibold border border-emerald-400/30"
       : "flex items-center bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-semibold border border-green-200";
@@ -365,13 +361,13 @@ export default function Dashboard() {
   };
 
   // StationBadge wrapper for WeatherStations (30 min)
-  const StationBadge = ({ timestamp }) => {
-    return <LiveBadge timestamp={timestamp} isDarkTheme={isDarkTheme} thresholdMin={30} />;
+  const StationBadge = ({ timestamp, stationId }) => {
+    return <LiveBadge timestamp={timestamp} isDarkTheme={isDarkTheme} thresholdMin={30} stationId={stationId} serviceType="AWS" />;
   };
 
-  // BarrageBadge wrapper for Barrage (20 min)
-  const BarrageBadge = ({ timestamp }) => {
-    return <LiveBadge timestamp={timestamp} isDarkTheme={isDarkTheme} thresholdMin={20} />;
+  // BarrageBadge wrapper for EWS stations (20 min)
+  const BarrageBadge = ({ timestamp, stationId }) => {
+    return <LiveBadge timestamp={timestamp} isDarkTheme={isDarkTheme} thresholdMin={20} stationId={stationId} serviceType="EWS" />;
   };
 
   // timestamp printing (no device)
@@ -437,6 +433,7 @@ export default function Dashboard() {
               isDarkTheme={isDarkTheme}
               BarrageBadge={BarrageBadge}
               timestampLine={timestampLine}
+              getStationStatus={getStationStatus}
             />
           </div>
 
@@ -461,6 +458,7 @@ export default function Dashboard() {
               StationBadge={StationBadge}
               isDarkTheme={isDarkTheme}
               timestampLine={timestampLine}
+              getStationStatus={getStationStatus}
             />
           </div>
         </div>
@@ -480,13 +478,20 @@ export default function Dashboard() {
 /* ---------------------------
    BarrageMonitoring (Vasudhara + Mana cards)
 --------------------------- */
-function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge, timestampLine }) {
-  const formatValue = (v, digits = 2) => {
+function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge, timestampLine, getStationStatus }) {
+  const formatValue = (v, digits = 2, isMaintenance = false) => {
+    if (isMaintenance) return "NIL";
     if (v === null || v === undefined || v === "") return "-";
     if (typeof v === "number") return Number.isInteger(v) ? v : Number(v.toFixed(digits));
     const n = Number(v);
     if (Number.isFinite(n)) return Number.isInteger(n) ? n : Number(n.toFixed(digits));
     return String(v);
+  };
+  
+  // Station ID mapping for EWS
+  const STATION_ID_MAP = {
+    Vasudhara: "ST020",
+    Mana: "ST019",
   };
 
   // flow direction rules
@@ -552,6 +557,12 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
       <div className="space-y-4">
         {stationsToShow.map((st) => {
           const data = ewsLatest?.[st.key];
+          const stationId = STATION_ID_MAP[st.key];
+          const statusInfo = getStationStatus(stationId, "EWS", data?.timestamp, 20);
+          const isMaintenance = statusInfo.status === "maintenance";
+          const displayTimestamp = statusInfo.status === "offline" && statusInfo.offlineTimestamp 
+            ? timestampLine(statusInfo.offlineTimestamp) 
+            : timestampLine(data?.timestamp);
 
           return (
             <div
@@ -585,11 +596,11 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
                             isDarkTheme ? "text-slate-400" : "text-gray-500"
                           }`}
                         >
-                          {timestampLine(data.timestamp)}
+                          {displayTimestamp}
                         </p>
                       </div>
 
-                      <BarrageBadge timestamp={data.timestamp} />
+                      <BarrageBadge timestamp={data.timestamp} stationId={stationId} />
                     </div>
                   </div>
 
@@ -613,7 +624,7 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
                           Surface Velocity
                         </p>
                         <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                          {formatValue(data.surface_velocity)} m/s
+                          {formatValue(data.surface_velocity, 2, isMaintenance)} {isMaintenance ? "" : "m/s"}
                         </p>
                       </div>
 
@@ -624,7 +635,7 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
                           Avg Velocity
                         </p>
                         <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                          {formatValue(data.avg_surface_velocity, 2)} m/s
+                          {formatValue(data.avg_surface_velocity, 2, isMaintenance)} {isMaintenance ? "" : "m/s"}
                         </p>
                       </div>
 
@@ -636,7 +647,7 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
                             SNR
                           </p>
                           <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                            {formatValue(data.SNR, 2)} dB
+                            {formatValue(data.SNR, 2, isMaintenance)} {isMaintenance ? "" : "dB"}
                           </p>
                         </div>
                       )}
@@ -648,7 +659,9 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
                           Discharge
                         </p>
                         <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                          {data.water_discharge === null
+                          {isMaintenance 
+                            ? "NIL"
+                            : data.water_discharge === null
                             ? "-"
                             : `${formatValue(data.water_discharge, 2)} m³/s`}
                         </p>
@@ -677,7 +690,7 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
                           Water Level
                         </p>
                         <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                          {formatValue(data.water_level, 2)} m
+                          {formatValue(data.water_level, 2, isMaintenance)} {isMaintenance ? "" : "m"}
                         </p>
                       </div>
 
@@ -688,7 +701,7 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
                           Distance from Sensor
                         </p>
                         <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                          {formatValue(data.water_dist_sensor, 2)} m
+                          {formatValue(data.water_dist_sensor, 2, isMaintenance)} {isMaintenance ? "" : "m"}
                         </p>
                       </div>
 
@@ -699,7 +712,7 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
                           Tilt
                         </p>
                         <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                          {formatValue(data.tilt_angle, 1)}°
+                          {formatValue(data.tilt_angle, 1, isMaintenance)} {isMaintenance ? "" : "°"}
                         </p>
                       </div>
 
@@ -710,7 +723,7 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
                           Flow Dir
                         </p>
                         <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                          {displayFlowDirection(data.flow_direction)}
+                          {isMaintenance ? "NIL" : displayFlowDirection(data.flow_direction)}
                         </p>
                       </div>
                     </div>
@@ -737,7 +750,7 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
                             Internal Temperature
                           </p>
                           <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                            {formatValue(data.internal_temperature, 1)}°C
+                            {formatValue(data.internal_temperature, 1, isMaintenance)} {isMaintenance ? "" : "°C"}
                           </p>
                         </div>
 
@@ -748,7 +761,7 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
                             Charge Current
                           </p>
                           <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                            {formatValue(data.charge_current, 4)} A
+                            {formatValue(data.charge_current, 4, isMaintenance)} {isMaintenance ? "" : "A"}
                           </p>
                         </div>
 
@@ -759,7 +772,7 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
                             Absorbed Current
                           </p>
                           <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                            {formatValue(data.absorbed_current, 4)} A
+                            {formatValue(data.absorbed_current, 4, isMaintenance)} {isMaintenance ? "" : "A"}
                           </p>
                         </div>
 
@@ -770,7 +783,7 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
                             Battery Voltage
                           </p>
                           <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                            {formatValue(data.battery_voltage, 1)} V
+                            {formatValue(data.battery_voltage, 1, isMaintenance)} {isMaintenance ? "" : "V"}
                           </p>
                         </div>
 
@@ -801,9 +814,18 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
 /* ---------------------------
    WeatherStationsSection (updated timestamps, removed stationID & device)
    --------------------------- */
-function WeatherStationsSection({ weatherData, StationBadge, isDarkTheme, timestampLine }) {
-  const formatValue = (value, suffix = "") =>
-    value === null || value === undefined || value === "" ? "-" : `${value} ${suffix}`.trim();
+function WeatherStationsSection({ weatherData, StationBadge, isDarkTheme, timestampLine, getStationStatus }) {
+  const formatValue = (value, suffix = "", isMaintenance = false) => {
+    if (isMaintenance) return "NIL";
+    return value === null || value === undefined || value === "" ? "-" : `${value} ${suffix}`.trim();
+  };
+  
+  // Station ID mapping for AWS
+  const STATION_ID_MAP = {
+    "Barrage": "ST015",
+    "Mana": "ST019",
+    "Vasudhara": "ST020",
+  };
 
   const metricSections = [
     {
@@ -881,7 +903,15 @@ function WeatherStationsSection({ weatherData, StationBadge, isDarkTheme, timest
         <p className="text-center text-gray-400 mt-10">No weather data available</p>
       ) : (
         <div className="space-y-3">
-          {weatherData.map((station) => (
+          {weatherData.map((station) => {
+            const stationId = STATION_ID_MAP[station.station] || null;
+            const statusInfo = getStationStatus(stationId, "AWS", station.timestamp, 30);
+            const isMaintenance = statusInfo.status === "maintenance";
+            const displayTimestamp = statusInfo.status === "offline" && statusInfo.offlineTimestamp 
+              ? timestampLine(statusInfo.offlineTimestamp) 
+              : timestampLine(station.timestamp);
+            
+            return (
             <div
               key={station.station}
               className={`rounded-2xl p-3 shadow-lg border ${
@@ -911,10 +941,10 @@ function WeatherStationsSection({ weatherData, StationBadge, isDarkTheme, timest
 
                   {/* single-line timestamp only (no device) */}
                   <p className={`text-[10px] ${isDarkTheme ? "text-slate-300" : "text-gray-400"}`}>
-                    {timestampLine(station.timestamp)}
+                    {displayTimestamp}
                   </p>
                 </div>
-                <StationBadge timestamp={station.timestamp} />
+                <StationBadge timestamp={station.timestamp} stationId={stationId} />
               </div>
 
               <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
@@ -954,8 +984,8 @@ function WeatherStationsSection({ weatherData, StationBadge, isDarkTheme, timest
                             }`}
                           >
                             {metric.key === "windDirection"
-                              ? displayFlowDirection(station[metric.key])
-                              : formatValue(station[metric.key], metric.suffix)}
+                              ? (isMaintenance ? "NIL" : displayFlowDirection(station[metric.key]))
+                              : formatValue(station[metric.key], metric.suffix, isMaintenance)}
                           </span>
                         </div>
                       ))}
@@ -964,7 +994,8 @@ function WeatherStationsSection({ weatherData, StationBadge, isDarkTheme, timest
                 ))}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </motion.div>

@@ -11,6 +11,7 @@ import {
 
 import Navbar from "../../components/Navbar";
 import EWSDashboardGraph from "../../components/EWSDashboardGraph";
+import { useStationStatus } from "../../hooks/useStationStatus";
 
 const SplashScreen = dynamic(() => import("../../components/SplashScreen"), { ssr: false });
 
@@ -20,6 +21,13 @@ export default function EWSPage() {
   const [liveStations, setLiveStations] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const { getStationStatus } = useStationStatus();
+  
+  // Station ID mapping
+  const STATION_ID_MAP = {
+    "Vasudhara": "ST020",
+    "Mana": "ST019",
+  };
 
   // INIT THEME
   useEffect(() => {
@@ -100,7 +108,8 @@ export default function EWSPage() {
   }, []);
 
   // helpers
-  const safeNum = (v, fixed = 2) => {
+  const safeNum = (v, fixed = 2, isMaintenance = false) => {
+    if (isMaintenance) return "NIL";
     if (v === null || v === undefined || v === "") return "--";
     const n = parseFloat(v);
     return isNaN(n) ? "--" : n.toFixed(fixed);
@@ -124,10 +133,22 @@ export default function EWSPage() {
     return "normal";
   };
 
-  const isOffline = (ts) => {
-    if (!ts) return true;
-    const diffMin = (Date.now() - new Date(ts).getTime()) / 60000;
-    return diffMin > 20;
+  const isOffline = (stationName, ts) => {
+    const stationId = STATION_ID_MAP[stationName];
+    if (!stationId) {
+      // Fallback to old logic if station not in map
+      if (!ts) return true;
+      const diffMin = (Date.now() - new Date(ts).getTime()) / 60000;
+      return diffMin > 20;
+    }
+    const statusInfo = getStationStatus(stationId, "EWS", ts, 20);
+    return statusInfo.status !== "live";
+  };
+  
+  const getStationStatusInfo = (stationName, ts) => {
+    const stationId = STATION_ID_MAP[stationName];
+    if (!stationId) return { status: "offline", isManual: false, offlineTimestamp: null };
+    return getStationStatus(stationId, "EWS", ts, 20);
   };
 
   const formattedTime = (ts) => {
@@ -202,7 +223,9 @@ export default function EWSPage() {
             if (!item) return null;
 
             const status = statusType(item.water_discharge);
-            const offline = isOffline(item.timestamp);
+            const statusInfo = getStationStatusInfo(station, item.timestamp);
+            const offline = statusInfo.status !== "live";
+            const isMaintenance = statusInfo.status === "maintenance";
 
             return (
               <div
@@ -236,7 +259,9 @@ export default function EWSPage() {
                       {station}
                     </span>
 
-                    {offline
+                    {isMaintenance
+                      ? <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 md:w-3 md:h-3 bg-yellow-500 rounded-full flex-shrink-0" />
+                      : offline
                       ? <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 md:w-3 md:h-3 bg-red-500 rounded-full flex-shrink-0" />
                       : <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 md:w-3 md:h-3 bg-green-400 rounded-full animate-ping flex-shrink-0" />
                     }
@@ -258,7 +283,9 @@ export default function EWSPage() {
                 </div>
 
                 <p className="text-[10px] sm:text-xs opacity-70 mb-2 sm:mb-3">
-                  Updated: {formattedTime(item.timestamp)}
+                  Updated: {statusInfo.status === "offline" && statusInfo.offlineTimestamp 
+                    ? formattedTime(statusInfo.offlineTimestamp) 
+                    : formattedTime(item.timestamp)}
                 </p>
 
                 <div className="space-y-1.5 sm:space-y-2 md:space-y-3">
@@ -275,7 +302,7 @@ export default function EWSPage() {
                     </span>
                     <span className={`font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0 font-semibold ${
                       status === "alert" || status === "warning" ? "text-red-400" : "text-green-400"
-                    }`}>{safeNum(item.water_discharge)} m³/s</span>
+                    }`}>{safeNum(item.water_discharge, 2, isMaintenance)} {isMaintenance ? "" : "m³/s"}</span>
                   </div>
 
                   <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
@@ -285,7 +312,7 @@ export default function EWSPage() {
                       <Waves size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" /> 
                       <span className="truncate">Level</span>
                     </span>
-                    <span className="font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0">{safeNum(item.water_level)} m</span>
+                    <span className="font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0">{safeNum(item.water_level, 2, isMaintenance)} {isMaintenance ? "" : "m"}</span>
                   </div>
 
                   <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
@@ -296,7 +323,7 @@ export default function EWSPage() {
                       <span className="truncate">Velocity</span>
                     </span>
                     <span className="font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0">
-  {safeNum(item.surface_velocity)} m/s
+  {safeNum(item.surface_velocity, 2, isMaintenance)} {isMaintenance ? "" : "m/s"}
 </span>
 
                   </div>
@@ -308,7 +335,7 @@ export default function EWSPage() {
                       <Ruler size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" />
                       <span className="truncate">Water Distance from Sensor</span>
                     </span>
-                    <span className="font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0">{safeNum(item.water_dist_sensor)} m</span>
+                    <span className="font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0">{safeNum(item.water_dist_sensor, 2, isMaintenance)} {isMaintenance ? "" : "m"}</span>
                   </div>
                 </div>
 
@@ -321,7 +348,7 @@ export default function EWSPage() {
                       <span className="truncate">Tilt Angle</span>
                     </span>
                     <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                      {safeNum(item.tilt_angle)}°
+                      {safeNum(item.tilt_angle, 1, isMaintenance)} {isMaintenance ? "" : "°"}
                     </span>
                   </div>
 
@@ -331,7 +358,7 @@ export default function EWSPage() {
                       <span className="truncate">Flow Dir</span>
                     </span>
                     <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                      {formatFlowDirection(item.flow_direction)}
+                      {isMaintenance ? "NIL" : formatFlowDirection(item.flow_direction)}
                     </span>
                   </div>
 
@@ -342,7 +369,7 @@ export default function EWSPage() {
                         <span className="truncate">SNR</span>
                       </span>
                       <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                        {safeNum(item.SNR)} dB
+                        {safeNum(item.SNR, 2, isMaintenance)} {isMaintenance ? "" : "dB"}
                       </span>
                     </div>
                   )}
@@ -355,7 +382,7 @@ export default function EWSPage() {
                           <span className="truncate">Internal Temperature</span>
                         </span>
                         <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                          {safeNum(item.internal_temperature, 1)}°C
+                          {safeNum(item.internal_temperature, 1, isMaintenance)} {isMaintenance ? "" : "°C"}
                         </span>
                       </div>
 
@@ -365,7 +392,7 @@ export default function EWSPage() {
                           <span className="truncate">Charge Current</span>
                         </span>
                         <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                          {safeNum(item.charge_current, 4)} A
+                          {safeNum(item.charge_current, 4, isMaintenance)} {isMaintenance ? "" : "A"}
                         </span>
                       </div>
 
@@ -375,7 +402,7 @@ export default function EWSPage() {
                           <span className="truncate">Absorbed Current</span>
                         </span>
                         <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                          {safeNum(item.observed_current, 4)} A
+                          {safeNum(item.observed_current, 4, isMaintenance)} {isMaintenance ? "" : "A"}
                         </span>
                       </div>
 
@@ -385,7 +412,7 @@ export default function EWSPage() {
                           <span className="truncate">Battery Voltage</span>
                         </span>
                         <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                          {safeNum(item.battery_voltage, 1)} V
+                          {safeNum(item.battery_voltage, 1, isMaintenance)} {isMaintenance ? "" : "V"}
                         </span>
                       </div>
 
@@ -395,7 +422,7 @@ export default function EWSPage() {
                           <span className="truncate">Solar Panel Tracking</span>
                         </span>
                         <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                          {safeNum(item.solar_panel_tracking, 1)} V
+                          {safeNum(item.solar_panel_tracking, 1, isMaintenance)} {isMaintenance ? "" : "V"}
                         </span>
                       </div>
                     </>
