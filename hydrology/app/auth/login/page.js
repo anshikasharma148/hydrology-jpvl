@@ -9,6 +9,7 @@ import logo from "../../../public/images/logo.png";
 
 export default function Login() {
   const router = useRouter();
+  const { showAlert } = useNotification();
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -47,7 +48,7 @@ export default function Login() {
     e.preventDefault();
 
     if (isFirstLogin && formData.newPassword !== formData.confirmPassword) {
-      alert("New password and confirm password must match");
+      showAlert("New password and confirm password must match", 'error');
       return;
     }
 
@@ -72,7 +73,7 @@ export default function Login() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || "Failed to update password");
 
-        alert("Password updated successfully. Please log in now.");
+        showAlert("Password updated successfully. Please log in now.", 'success');
         setIsFirstLogin(false);
       } else {
         // Normal login - retry once if first attempt fails (server might be waking up)
@@ -119,7 +120,7 @@ export default function Login() {
         router.push("/dashboard");
       }
     } catch (error) {
-      alert(error.message);
+      showAlert(error.message, 'error');
     } finally {
       setIsLoading(false);
     }

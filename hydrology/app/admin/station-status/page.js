@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNotification } from "../../../components/NotificationToast";
 
 // Station configuration
 const STATIONS = [
@@ -22,6 +23,7 @@ const getBackendUrl = () => {
 
 export default function StationStatusManagement() {
   const router = useRouter();
+  const { showAlert, showConfirm } = useNotification();
   const [statuses, setStatuses] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState({});
@@ -93,13 +95,14 @@ export default function StationStatusManagement() {
     
     // Validate input
     if (statusInput.trim() !== expectedStatusText) {
-      alert(`Please type "${expectedStatusText}" exactly to confirm the status change.`);
+      showAlert(`Please type "${expectedStatusText}" exactly to confirm the status change.`, 'warning');
       return;
     }
 
-    // Show confirmation alert
+    // Show confirmation dialog
     const confirmMessage = `Do you want to change the status of ${stationName} (${serviceType}) to ${expectedStatusText}?`;
-    if (!window.confirm(confirmMessage)) {
+    const confirmed = await showConfirm(confirmMessage);
+    if (!confirmed) {
       setShowDialog(false);
       setDialogData(null);
       setStatusInput("");
@@ -128,11 +131,11 @@ export default function StationStatusManagement() {
         await fetchStatuses();
         showSuccess(`Status updated to ${expectedStatusText}`);
       } else {
-        alert(`Error: ${result.error || "Failed to update status"}`);
+        showAlert(`Error: ${result.error || "Failed to update status"}`, 'error');
       }
     } catch (error) {
       console.error("Error updating status:", error);
-      alert("Failed to update status. Please try again.");
+      showAlert("Failed to update status. Please try again.", 'error');
     } finally {
       setSaving({ ...saving, [key]: false });
       setDialogData(null);
@@ -141,7 +144,8 @@ export default function StationStatusManagement() {
   };
 
   const handleRemoveStatus = async (stationId, serviceType) => {
-    if (!confirm("Remove manual status? Station will revert to automatic offline detection.")) {
+    const confirmed = await showConfirm("Remove manual status? Station will revert to automatic offline detection.");
+    if (!confirmed) {
       return;
     }
 
@@ -160,11 +164,11 @@ export default function StationStatusManagement() {
         await fetchStatuses();
         showSuccess("Manual status removed successfully");
       } else {
-        alert(`Error: ${result.error || "Failed to remove status"}`);
+        showAlert(`Error: ${result.error || "Failed to remove status"}`, 'error');
       }
     } catch (error) {
       console.error("Error removing status:", error);
-      alert("Failed to remove status. Please try again.");
+      showAlert("Failed to remove status. Please try again.", 'error');
     } finally {
       setSaving({ ...saving, [key]: false });
     }

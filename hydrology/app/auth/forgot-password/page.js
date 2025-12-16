@@ -1,12 +1,14 @@
 "use client";
 import { useState } from "react";
+import { useNotification } from "../../../components/NotificationToast";
 
 export default function ForgotPassword() {
+  const { showAlert } = useNotification();
   const [email, setEmail] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    alert(`Password reset link sent to: ${email}`);
+    showAlert(`Password reset link sent to: ${email}`, 'success');
   };
 
   return (

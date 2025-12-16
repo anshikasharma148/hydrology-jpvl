@@ -1,7 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useNotification } from "../../../components/NotificationToast";
 
 export default function UserManagement() {
+  const { showAlert, showConfirm } = useNotification();
   const [users, setUsers] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -35,8 +37,9 @@ export default function UserManagement() {
   }, []);
 
   // ✅ Reset Password
-  const handleResetPassword = async (userId, userName) => {
-    if (!confirm(`Reset password for ${userName} to default (cdc@123)?`)) return;
+const handleResetPassword = async (userId, userName) => {
+    const confirmed = await showConfirm(`Reset password for ${userName} to default (cdc@123)?`);
+    if (!confirmed) return;
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(
@@ -47,16 +50,17 @@ export default function UserManagement() {
         }
       );
       if (!res.ok) throw new Error("Failed to reset password");
-      alert("Password reset to default (cdc@123) and status set to Pending.");
+      showAlert("Password reset to default (cdc@123) and status set to Pending.", 'success');
       fetchUsers();
     } catch (err) {
-      alert(err.message);
+      showAlert(err.message, 'error');
     }
   };
 
   // ✅ Delete User
   const handleDelete = async (userId, userName) => {
-    if (!confirm(`Are you sure you want to delete ${userName}? This action cannot be undone.`)) return;
+    const confirmed = await showConfirm(`Are you sure you want to delete ${userName}? This action cannot be undone.`);
+    if (!confirmed) return;
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(
@@ -64,10 +68,10 @@ export default function UserManagement() {
         { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } }
       );
       if (!res.ok) throw new Error("Failed to delete user");
-      alert("User deleted successfully");
+      showAlert("User deleted successfully", 'success');
       fetchUsers();
     } catch (err) {
-      alert(err.message);
+      showAlert(err.message, 'error');
     }
   };
 
