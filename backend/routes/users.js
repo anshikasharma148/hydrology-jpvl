@@ -1,9 +1,36 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { usersDB } = require("../db");
+const { usersDB, hydrologyDB } = require("../db");
 
 const router = express.Router();
+
+// Helper function to get client IP address
+const getClientIP = (req) => {
+  return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+         req.headers['x-real-ip'] ||
+         req.connection?.remoteAddress ||
+         req.socket?.remoteAddress ||
+         req.ip ||
+         'Unknown';
+};
+
+// Helper function to log login attempt
+const logLoginAttempt = async (userId, email, name, role, ipAddress, loginType, status) => {
+  try {
+    console.log(`[LOGIN LOG] Attempting to log: ${email}, ${name}, ${role}, ${ipAddress}, ${loginType}, ${status}`);
+    const result = await hydrologyDB.query(
+      `INSERT INTO login_logs (user_id, email, name, role, ip_address, login_type, login_status, login_timestamp)
+       VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [userId, email, name, role, ipAddress, loginType, status]
+    );
+    console.log(`[LOGIN LOG] Successfully logged login attempt. Insert ID: ${result[0]?.insertId || 'N/A'}`);
+  } catch (error) {
+    console.error("[LOGIN LOG] Error logging login attempt:", error.message);
+    console.error("[LOGIN LOG] Full error:", error);
+    // Don't throw error - logging failure shouldn't break login
+  }
+};
 
 // ====================
 // 🔐 JWT Middleware
@@ -83,10 +110,18 @@ router.post("/register", async (req, res) => {
 // ====================
 router.post("/login", async (req, res) => {
   try {
+    console.log("[LOGIN] Login attempt received");
     const { email, password } = req.body;
+    const ipAddress = getClientIP(req);
+    console.log(`[LOGIN] Email: ${email}, IP: ${ipAddress}`);
 
     const [user] = await usersDB.query("SELECT * FROM users WHERE email = ?", [email]);
-    if (user.length === 0) return res.status(400).json({ error: "Invalid credentials" });
+    
+    if (user.length === 0) {
+      // Log failed login attempt
+      await logLoginAttempt(null, email, 'Unknown', 'Unknown', ipAddress, 'user', 'failed');
+      return res.status(400).json({ error: "Invalid credentials" });
+    }
 
     const dbUser = user[0];
     let validPass = false;
@@ -97,7 +132,16 @@ router.post("/login", async (req, res) => {
       validPass = password === dbUser.default_password;
     }
 
-    if (!validPass) return res.status(400).json({ error: "Invalid credentials" });
+    if (!validPass) {
+      // Log failed login attempt
+      const fullName = `${dbUser.first_name || ''} ${dbUser.last_name || ''}`.trim() || 'Unknown';
+      await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, 'user', 'failed');
+      return res.status(400).json({ error: "Invalid credentials" });
+    }
+
+    // Log successful login
+    const fullName = `${dbUser.first_name || ''} ${dbUser.last_name || ''}`.trim() || 'Unknown';
+    await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, 'user', 'success');
 
     const token = jwt.sign(
       { id: dbUser.id, role: dbUser.role },
@@ -130,6 +174,7 @@ router.post("/login", async (req, res) => {
 router.post("/admin-login", async (req, res) => {
   try {
     const { email, password } = req.body;
+    const ipAddress = getClientIP(req);
 
     const [rows] = await usersDB.query(
       "SELECT * FROM users WHERE email = ? AND LOWER(role) = 'admin'",
@@ -137,6 +182,8 @@ router.post("/admin-login", async (req, res) => {
     );
 
     if (rows.length === 0) {
+      // Log failed admin login attempt
+      await logLoginAttempt(null, email, 'Unknown', 'admin', ipAddress, 'admin', 'failed');
       return res.status(403).json({ message: "Access denied. Not an admin" });
     }
 
@@ -150,8 +197,15 @@ router.post("/admin-login", async (req, res) => {
     }
 
     if (!isMatch) {
+      // Log failed admin login attempt
+      const fullName = `${admin.first_name || ''} ${admin.last_name || ''}`.trim() || 'Unknown';
+      await logLoginAttempt(admin.id, email, fullName, admin.role, ipAddress, 'admin', 'failed');
       return res.status(400).json({ message: "Invalid credentials" });
     }
+
+    // Log successful admin login
+    const fullName = `${admin.first_name || ''} ${admin.last_name || ''}`.trim() || 'Unknown';
+    await logLoginAttempt(admin.id, email, fullName, admin.role, ipAddress, 'admin', 'success');
 
     const token = jwt.sign(
       { id: admin.id, role: admin.role },
@@ -166,7 +220,7 @@ router.post("/admin-login", async (req, res) => {
         id: admin.id,
         email: admin.email,
         role: admin.role,
-        name: `${admin.first_name} ${admin.last_name}`,
+        name: fullName,
       },
     });
 
@@ -351,6 +405,71 @@ router.delete("/admin/users/:id", authenticate, isAdmin, async (req, res) => {
   } catch (error) {
     console.error("Admin Delete User error:", error);
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ====================
+// 📋 Get Login Logs (Admin Only)
+// ====================
+router.get("/admin/login-logs", authenticate, isAdmin, async (req, res) => {
+  try {
+    const { limit = 100, offset = 0, status, loginType, email } = req.query;
+    
+    let query = "SELECT * FROM login_logs WHERE 1=1";
+    const params = [];
+    
+    if (status) {
+      query += " AND login_status = ?";
+      params.push(status);
+    }
+    
+    if (loginType) {
+      query += " AND login_type = ?";
+      params.push(loginType);
+    }
+    
+    if (email) {
+      query += " AND email LIKE ?";
+      params.push(`%${email}%`);
+    }
+    
+    query += " ORDER BY login_timestamp DESC LIMIT ? OFFSET ?";
+    params.push(parseInt(limit), parseInt(offset));
+    
+    const [logs] = await hydrologyDB.query(query, params);
+    
+    // Get total count for pagination
+    let countQuery = "SELECT COUNT(*) as total FROM login_logs WHERE 1=1";
+    const countParams = [];
+    
+    if (status) {
+      countQuery += " AND login_status = ?";
+      countParams.push(status);
+    }
+    
+    if (loginType) {
+      countQuery += " AND login_type = ?";
+      countParams.push(loginType);
+    }
+    
+    if (email) {
+      countQuery += " AND email LIKE ?";
+      countParams.push(`%${email}%`);
+    }
+    
+    const [countResult] = await hydrologyDB.query(countQuery, countParams);
+    const total = countResult[0]?.total || 0;
+    
+    res.json({
+      success: true,
+      data: logs,
+      total,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    console.error("Error fetching login logs:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

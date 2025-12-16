@@ -5,6 +5,14 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import logo from "../../../public/images/logo.png";
 
+// Get backend URL - use localhost if running locally, otherwise use Render
+const getBackendUrl = () => {
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+  }
+  return process.env.NEXT_PUBLIC_BACKEND_URL || "https://hydrology-jpvl.onrender.com";
+};
+
 export default function AdminLogin() {
   const router = useRouter();
   const [adminData, setAdminData] = useState({ email: "", password: "" });
@@ -48,7 +56,8 @@ export default function AdminLogin() {
   // Pre-wake backend to prevent sleep issues
   const wakeBackend = async () => {
     try {
-      await fetch("https://hydrology-jpvl.onrender.com/api/ping", {
+      const backendUrl = getBackendUrl();
+      await fetch(`${backendUrl}/api/ping`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
@@ -79,7 +88,8 @@ export default function AdminLogin() {
       
       while (retries > 0) {
         try {
-          res = await fetch("https://hydrology-jpvl.onrender.com/api/users/admin-login", {
+          const backendUrl = getBackendUrl();
+          res = await fetch(`${backendUrl}/api/users/admin-login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(adminData),

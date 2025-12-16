@@ -8,6 +8,14 @@ import Image from "next/image";
 import logo from "../../../public/images/logo.png";
 import { useNotification } from "../../../components/NotificationToast";
 
+// Get backend URL - use localhost if running locally, otherwise use Render
+const getBackendUrl = () => {
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+  }
+  return process.env.NEXT_PUBLIC_BACKEND_URL || "https://hydrology-jpvl.onrender.com";
+};
+
 export default function Login() {
   const router = useRouter();
   const { showAlert } = useNotification();
@@ -33,7 +41,8 @@ export default function Login() {
   // Pre-wake backend to prevent sleep issues
   const wakeBackend = async () => {
     try {
-      await fetch("https://hydrology-jpvl.onrender.com/api/ping", {
+      const backendUrl = getBackendUrl();
+      await fetch(`${backendUrl}/api/ping`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
@@ -61,7 +70,8 @@ export default function Login() {
 
       if (isFirstLogin) {
         // First login → update password
-        const res = await fetch("https://hydrology-jpvl.onrender.com/api/users/update-password", {
+        const backendUrl = getBackendUrl();
+        const res = await fetch(`${backendUrl}/api/users/update-password`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -84,7 +94,8 @@ export default function Login() {
         
         while (retries > 0) {
           try {
-            res = await fetch("https://hydrology-jpvl.onrender.com/api/users/login", {
+            const backendUrl = getBackendUrl();
+            res = await fetch(`${backendUrl}/api/users/login`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({

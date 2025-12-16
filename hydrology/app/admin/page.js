@@ -116,6 +116,19 @@ export default function AdminHome() {
               </div>
             </a>
 
+            {/* Login Logs */}
+            <a href="/admin/login-logs" className="flex items-center p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-indigo-50 hover:shadow-md transform hover:scale-[1.02] transition-all duration-200 group">
+              <div className="flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 bg-indigo-100 rounded-lg mr-3 sm:mr-4 group-hover:bg-indigo-200 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="font-medium text-gray-700 text-sm sm:text-base group-hover:text-indigo-600">Login Logs</h2>
+                <p className="text-xs sm:text-sm text-gray-500">View user login activities and history</p>
+              </div>
+            </a>
+
             {/* Settings */}
             <a href="/admin/settings" className="flex items-center p-3 sm:p-4 bg-gray-50 rounded-lg hover:bg-indigo-50 hover:shadow-md transform hover:scale-[1.02] transition-all duration-200 group">
               <div className="flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10 bg-indigo-100 rounded-lg mr-3 sm:mr-4 group-hover:bg-indigo-200 transition">

@@ -68,6 +68,7 @@ app.use((req, res, next) => {
     "https://hydrology.cird.co.in",
     "http://115.242.156.230:5000",
     "http://localhost:3000",
+    "http://localhost:3001",
     "https://hydrology-jpvl.onrender.com",
     "https://hydrology-jpvl.vercel.app",
   ];
