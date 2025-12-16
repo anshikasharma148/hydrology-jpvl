@@ -194,6 +194,7 @@ export default function Login() {
                 email: formData.email,
                 password: formData.password,
                 role: formData.role,
+                userLocation: userLocation, // Send browser geolocation if available
               }),
             });
 
