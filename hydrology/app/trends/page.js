@@ -126,11 +126,29 @@ export default function TrendsPage() {
       let formattedData = [];
 
       if (selectedType === "AWS") {
-        // As-Is
-        const key =
-          selectedStation.includes("mana") ? "Mana" : "Lambagad";
+        // Map station slug to API key
+        let key;
+        if (selectedStation.includes("mana")) {
+          key = "Mana";
+        } else if (selectedStation.includes("vasudhara")) {
+          key = "Vasudhara";
+        } else {
+          key = "Lambagad";
+        }
 
         const arr = raw?.data?.[key] || [];
+        
+        // Get the latest timestamp from raw data (before filtering)
+        if (arr.length > 0) {
+          const latest = arr.reduce((latest, current) => {
+            const latestTime = new Date(latest.timestamp || 0).getTime();
+            const currentTime = new Date(current.timestamp || 0).getTime();
+            return currentTime > latestTime ? current : latest;
+          }, arr[0]);
+          setLatestTimestamp(latest.timestamp);
+        } else {
+          setLatestTimestamp(null);
+        }
 
         formattedData = arr.map((item) => ({
           timestamp: item.timestamp,
