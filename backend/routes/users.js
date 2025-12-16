@@ -146,9 +146,9 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     console.log("[LOGIN] Login attempt received");
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
     const ipAddress = await getClientIP(req);
-    console.log(`[LOGIN] Email: ${email}, IP: ${ipAddress}`);
+    console.log(`[LOGIN] Email: ${email}, IP: ${ipAddress}, Requested Role: ${role}`);
 
     const [user] = await usersDB.query("SELECT * FROM users WHERE email = ?", [email]);
     
@@ -159,6 +159,23 @@ router.post("/login", async (req, res) => {
     }
 
     const dbUser = user[0];
+    
+    // Security: Reject if user is trying to log in as admin through regular login route
+    // Admins must use /admin-login route
+    if (role && role.toLowerCase() === 'admin') {
+      const fullName = `${dbUser.first_name || ''} ${dbUser.last_name || ''}`.trim() || 'Unknown';
+      await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, 'user', 'failed');
+      return res.status(403).json({ error: "Admins must use the admin login page" });
+    }
+    
+    // Security: Reject if user is actually an admin trying to use regular login
+    // Admins should use /admin-login route
+    if (dbUser.role && dbUser.role.toLowerCase() === 'admin') {
+      const fullName = `${dbUser.first_name || ''} ${dbUser.last_name || ''}`.trim() || 'Unknown';
+      await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, 'user', 'failed');
+      return res.status(403).json({ error: "Admins must use the admin login page" });
+    }
+    
     let validPass = false;
 
     if (dbUser.new_password) {
