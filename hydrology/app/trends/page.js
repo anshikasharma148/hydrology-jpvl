@@ -31,7 +31,7 @@ import {
   Sun
 } from "lucide-react";
 import Navbar from "components/Navbar";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 // KEEP ONLY 2 EWS STATIONS
 const ewsStations = [
