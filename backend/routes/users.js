@@ -58,17 +58,17 @@ const getIPLocation = async (ipAddress) => {
   }
 
   try {
-    const https = require('https');
+    const http = require('http');
     console.log(`[IP Location] Fetching location data for IP: ${ipAddress}`);
     const locationData = await new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         console.warn(`[IP Location] Request timeout for IP: ${ipAddress}`);
         reject(new Error('Timeout'));
       }, 3000);
-      // Using ip-api.com free service (no API key required)
-      const url = `https://ip-api.com/json/${ipAddress}?fields=status,message,country,regionName,city,isp,org`;
+      // Using ip-api.com free service (HTTP only for free tier, no API key required)
+      const url = `http://ip-api.com/json/${ipAddress}?fields=status,message,country,regionName,city,isp,org`;
       console.log(`[IP Location] Requesting: ${url}`);
-      https.get(url, (res) => {
+      http.get(url, (res) => {
         let data = '';
         res.on('data', (chunk) => { data += chunk; });
         res.on('end', () => {
