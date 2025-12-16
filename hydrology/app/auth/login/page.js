@@ -6,6 +6,7 @@ import { EyeIcon, EyeSlashIcon, ArrowPathIcon } from "@heroicons/react/20/solid"
 import AuthSlider from "../../../components/AuthSlider";
 import Image from "next/image";
 import logo from "../../../public/images/logo.png";
+import { useNotification } from "../../../components/NotificationToast";
 
 export default function Login() {
   const router = useRouter();
