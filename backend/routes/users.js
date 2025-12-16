@@ -208,8 +208,10 @@ router.post("/login", async (req, res) => {
 // =====================
 router.post("/admin-login", async (req, res) => {
   try {
+    console.log("[ADMIN LOGIN] Admin login attempt received");
     const { email, password } = req.body;
-    const ipAddress = getClientIP(req);
+    const ipAddress = await getClientIP(req);
+    console.log(`[ADMIN LOGIN] Email: ${email}, IP: ${ipAddress}`);
 
     const [rows] = await usersDB.query(
       "SELECT * FROM users WHERE email = ? AND LOWER(role) = 'admin'",
