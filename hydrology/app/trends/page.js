@@ -72,8 +72,26 @@ const MinimalOrbs = () => (
 
 export default function TrendsPage() {
   const router = useRouter();
+  
+  // Read URL parameters
+  const [urlParams, setUrlParams] = useState({ type: null, station: null, parameter: null });
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const type = params.get('type');
+      const station = params.get('station');
+      const parameter = params.get('parameter');
+      
+      if (type) setSelectedType(type);
+      if (station) setSelectedStation(station);
+      if (parameter) setSelectedParameter(parameter);
+    }
+  }, []);
+  
   const [selectedType, setSelectedType] = useState("AWS");
   const [selectedStation, setSelectedStation] = useState(awsStations[0].slug);
+  const [selectedParameter, setSelectedParameter] = useState(null);
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -268,6 +286,13 @@ export default function TrendsPage() {
     }
   };
 
+  // Update state when URL params change
+  useEffect(() => {
+    if (urlParams.type) setSelectedType(urlParams.type);
+    if (urlParams.station) setSelectedStation(urlParams.station);
+    if (urlParams.parameter) setSelectedParameter(urlParams.parameter);
+  }, [urlParams]);
+  
   // Refresh on dependencies
   useEffect(() => {
     fetchData();
@@ -637,6 +662,29 @@ export default function TrendsPage() {
         {/* Controls */}
         <div className="bg-white shadow-md border p-6 rounded-xl mb-8">
 
+          {/* Selected Parameter Info (if parameter is selected) */}
+          {selectedParameter && (
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Viewing:</p>
+                <p className="text-lg font-bold text-blue-700">
+                  {selectedType} • {(
+                    selectedType === "AWS" ? awsStations : ewsStations
+                  ).find((x) => x.slug === selectedStation)?.name} • {fields.find(f => f.key === selectedParameter)?.label}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedParameter(null);
+                  router.push('/trends');
+                }}
+                className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-medium"
+              >
+                View All Parameters
+              </button>
+            </div>
+          )}
+
           {/* Station Selector */}
           <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
             <div className="flex bg-gray-100 rounded-lg p-1">
@@ -648,6 +696,8 @@ export default function TrendsPage() {
                     setSelectedStation(
                       type === "AWS" ? awsStations[0].slug : "vasudhara"
                     );
+                    setSelectedParameter(null);
+                    router.push('/trends');
                   }}
                   className={`px-6 py-2 rounded-md font-medium ${
                     selectedType === type ? "bg-white shadow" : ""
@@ -675,7 +725,11 @@ export default function TrendsPage() {
                 {(selectedType === "AWS" ? awsStations : ewsStations).map((st) => (
                   <DropdownMenuItem
                     key={st.slug}
-                    onClick={() => setSelectedStation(st.slug)}
+                    onClick={() => {
+                      setSelectedStation(st.slug);
+                      setSelectedParameter(null);
+                      router.push('/trends');
+                    }}
                   >
                     {st.name}
                     {selectedStation === st.slug && <Check className="w-4 h-4 ml-auto" />}
@@ -683,6 +737,34 @@ export default function TrendsPage() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+            
+            {/* Parameter Selector (if no parameter selected) */}
+            {!selectedParameter && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    <Activity className="w-4 h-4 mr-2" />
+                    Select Parameter
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuLabel>Parameters</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {fields.map((field) => (
+                    <DropdownMenuItem
+                      key={field.key}
+                      onClick={() => {
+                        setSelectedParameter(field.key);
+                        router.push(`/trends?type=${selectedType}&station=${selectedStation}&parameter=${field.key}`);
+                      }}
+                    >
+                      {field.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            
             {/* Status Badge */}
             {(() => {
               const stationId = STATION_ID_MAP[selectedStation];
@@ -749,8 +831,11 @@ export default function TrendsPage() {
 
         {/* Charts */}
         {!loading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {fields.map((f, i) => {
+          <div className={selectedParameter ? "grid grid-cols-1 gap-6" : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"}>
+            {(selectedParameter 
+              ? fields.filter(f => f.key === selectedParameter)
+              : fields
+            ).map((f, i) => {
               const stats = getStats(f.key);
               const current = data.length > 0 ? data[data.length - 1]?.[f.key] : null;
               const previous = data.length > 1 ? data[data.length - 2]?.[f.key] : null;
@@ -836,7 +921,7 @@ export default function TrendsPage() {
                   <div className="relative">
                 <ReactECharts
                   option={getChartOption(f.key, f.label, f.unit, i)}
-                      style={{ height: "280px" }}
+                      style={{ height: selectedParameter ? "600px" : "280px" }}
                 />
               </div>
                 </div>
