@@ -373,61 +373,64 @@ export default function EWSPage() {
                       </span>
                     </div>
                   )}
-
-                  {station === "Vasudhara" && (
-                    <>
-                      <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
-                        <span className="flex items-center gap-1 sm:gap-2 truncate">
-                          <Thermometer size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-red-400 flex-shrink-0" /> 
-                          <span className="truncate">Internal Temperature</span>
-                        </span>
-                        <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                          {safeNum(item.internal_temperature, 1, isMaintenance)} {isMaintenance ? "" : "°C"}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
-                        <span className="flex items-center gap-1 sm:gap-2 truncate">
-                          <BatteryCharging size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-green-400 flex-shrink-0" /> 
-                          <span className="truncate">Charge Current</span>
-                        </span>
-                        <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                          {safeNum(item.charge_current, 4, isMaintenance)} {isMaintenance ? "" : "A"}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
-                        <span className="flex items-center gap-1 sm:gap-2 truncate">
-                          <Zap size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-yellow-400 flex-shrink-0" /> 
-                          <span className="truncate">Absorbed Current</span>
-                        </span>
-                        <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                          {safeNum(item.observed_current, 4, isMaintenance)} {isMaintenance ? "" : "A"}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
-                        <span className="flex items-center gap-1 sm:gap-2 truncate">
-                          <Battery size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" /> 
-                          <span className="truncate">Battery Voltage</span>
-                        </span>
-                        <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                          {safeNum(item.battery_voltage, 1, isMaintenance)} {isMaintenance ? "" : "V"}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
-                        <span className="flex items-center gap-1 sm:gap-2 truncate">
-                          <Sun size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-orange-400 flex-shrink-0" /> 
-                          <span className="truncate">Solar Panel Tracking</span>
-                        </span>
-                        <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                          {safeNum(item.solar_panel_tracking, 1, isMaintenance)} {isMaintenance ? "" : "V"}
-                        </span>
-                      </div>
-                    </>
-                  )}
                 </div>
+
+                {/* Power Section - Only for Vasudhara */}
+                {station === "Vasudhara" && (
+                  <div className="border-t mt-2 sm:mt-3 md:mt-4 pt-2 sm:pt-3 md:pt-4 space-y-1.5 sm:space-y-2 md:space-y-3">
+                    <p className="text-[10px] sm:text-xs md:text-sm font-bold uppercase tracking-wider text-orange-400">Power</p>
+
+                    <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
+                      <span className="flex items-center gap-1 sm:gap-2 truncate">
+                        <Thermometer size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-red-400 flex-shrink-0" /> 
+                        <span className="truncate">Internal Temperature</span>
+                      </span>
+                      <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                        {safeNum(item.internal_temperature, 1, isMaintenance)} {isMaintenance ? "" : "°C"}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
+                      <span className="flex items-center gap-1 sm:gap-2 truncate">
+                        <BatteryCharging size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-green-400 flex-shrink-0" /> 
+                        <span className="truncate">Charge Current</span>
+                      </span>
+                      <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                        {safeNum(item.charge_current, 4, isMaintenance)} {isMaintenance ? "" : "A"}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
+                      <span className="flex items-center gap-1 sm:gap-2 truncate">
+                        <Zap size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-yellow-400 flex-shrink-0" /> 
+                        <span className="truncate">Absorbed Current</span>
+                      </span>
+                      <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                        {safeNum(item.observed_current, 4, isMaintenance)} {isMaintenance ? "" : "A"}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
+                      <span className="flex items-center gap-1 sm:gap-2 truncate">
+                        <Battery size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" /> 
+                        <span className="truncate">Battery Voltage</span>
+                      </span>
+                      <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                        {safeNum(item.battery_voltage, 1, isMaintenance)} {isMaintenance ? "" : "V"}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
+                      <span className="flex items-center gap-1 sm:gap-2 truncate">
+                        <Sun size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-orange-400 flex-shrink-0" /> 
+                        <span className="truncate">Solar Panel Tracking</span>
+                      </span>
+                      <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                        {safeNum(item.solar_panel_tracking, 1, isMaintenance)} {isMaintenance ? "" : "V"}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
               </div>
             );
