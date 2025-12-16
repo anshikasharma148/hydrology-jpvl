@@ -199,7 +199,9 @@ router.post("/login", async (req, res) => {
 
     // Log successful login
     const fullName = `${dbUser.first_name || ''} ${dbUser.last_name || ''}`.trim() || 'Unknown';
-    await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, 'user', 'success');
+    // If user selected admin role and is admin, log as admin login, otherwise user login
+    const loginType = (role && role.toLowerCase() === 'admin' && dbUser.role && dbUser.role.toLowerCase() === 'admin') ? 'admin' : 'user';
+    await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, loginType, 'success');
 
     const token = jwt.sign(
       { id: dbUser.id, role: dbUser.role },
