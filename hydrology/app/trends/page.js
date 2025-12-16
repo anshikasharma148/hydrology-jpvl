@@ -317,13 +317,6 @@ export default function TrendsPage() {
     }
   };
 
-  // Update state when URL params change
-  useEffect(() => {
-    if (urlParams.type) setSelectedType(urlParams.type);
-    if (urlParams.station) setSelectedStation(urlParams.station);
-    if (urlParams.parameter) setSelectedParameter(urlParams.parameter);
-  }, [urlParams]);
-  
   // Refresh on dependencies
   useEffect(() => {
     fetchData();
