@@ -230,18 +230,26 @@ router.post("/admin-login", async (req, res) => {
     const ipAddress = await getClientIP(req);
     console.log(`[ADMIN LOGIN] Email: ${email}, IP: ${ipAddress}`);
 
-    const [rows] = await usersDB.query(
-      "SELECT * FROM users WHERE email = ? AND LOWER(role) = 'admin'",
-      [email]
-    );
-
-    if (rows.length === 0) {
+    // First check if user exists
+    const [userRows] = await usersDB.query("SELECT * FROM users WHERE email = ?", [email]);
+    
+    if (userRows.length === 0) {
       // Log failed admin login attempt
       await logLoginAttempt(null, email, 'Unknown', 'admin', ipAddress, 'admin', 'failed');
+      return res.status(403).json({ message: "Access denied. Invalid credentials" });
+    }
+
+    const user = userRows[0];
+    
+    // Security: Only allow users with admin role to use admin login
+    if (!user.role || user.role.toLowerCase() !== 'admin') {
+      // Log failed admin login attempt (non-admin trying to access admin login)
+      const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown';
+      await logLoginAttempt(user.id, email, fullName, user.role, ipAddress, 'admin', 'failed');
       return res.status(403).json({ message: "Access denied. Not an admin" });
     }
 
-    const admin = rows[0];
+    const admin = user;
 
     let isMatch = false;
     if (admin.new_password) {
