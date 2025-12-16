@@ -262,16 +262,22 @@ router.post("/admin-login", async (req, res) => {
     let isMatch = false;
     if (admin.new_password) {
       isMatch = await bcrypt.compare(password, admin.new_password);
+      console.log(`[ADMIN LOGIN] Password check (new_password): ${isMatch}`);
     } else {
+      // For default password, compare directly (not hashed)
       isMatch = password === admin.default_password;
+      console.log(`[ADMIN LOGIN] Password check (default_password): ${isMatch}, Provided: "${password}", Expected: "${admin.default_password}"`);
     }
 
     if (!isMatch) {
       // Log failed admin login attempt
       const fullName = `${admin.first_name || ''} ${admin.last_name || ''}`.trim() || 'Unknown';
+      console.log(`[ADMIN LOGIN] Password mismatch. Login failed.`);
       await logLoginAttempt(admin.id, email, fullName, admin.role, ipAddress, 'admin', 'failed');
       return res.status(400).json({ message: "Invalid credentials" });
     }
+    
+    console.log(`[ADMIN LOGIN] Password validated. Login successful.`);
 
     // Log successful admin login
     const fullName = `${admin.first_name || ''} ${admin.last_name || ''}`.trim() || 'Unknown';
