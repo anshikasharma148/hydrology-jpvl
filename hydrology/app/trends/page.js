@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import ReactECharts from "echarts-for-react";
 import { Button } from "@/components/ui/button";
 import { useStationStatus } from "../../hooks/useStationStatus";
@@ -70,7 +70,7 @@ const MinimalOrbs = () => (
   </div>
 );
 
-export default function TrendsPage() {
+function TrendsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -938,5 +938,17 @@ export default function TrendsPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function TrendsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-100 via-blue-50 to-gray-200 p-6 relative flex items-center justify-center">
+        <div className="animate-spin w-10 h-10 border-b-2 border-black rounded-full"></div>
+      </div>
+    }>
+      <TrendsPageContent />
+    </Suspense>
   );
 }
