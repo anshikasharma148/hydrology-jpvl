@@ -151,35 +151,60 @@ const getIPLocation = async (ipAddress) => {
 };
 
 // Helper function to log login attempt
-const logLoginAttempt = async (userId, email, name, role, ipAddress, loginType, status) => {
+const logLoginAttempt = async (userId, email, name, role, ipAddress, loginType, status, userLocationFromBrowser = null) => {
   try {
     console.log(`[LOGIN LOG] Attempting to log: ${email}, ${name}, ${role}, ${ipAddress}, ${loginType}, ${status}`);
     
-    // Get location and ISP info (with reasonable timeout)
+    // Priority 1: Use browser geolocation if provided (most accurate - user's actual location)
     let location = null;
     let ispName = null;
-    try {
-      console.log(`[LOGIN LOG] Fetching location for IP: ${ipAddress}`);
-      // Increase timeout to 5 seconds to allow API to respond
-      const locationInfo = await Promise.race([
-        getIPLocation(ipAddress),
-        new Promise((resolve) => {
-          setTimeout(() => {
-            console.warn('[LOGIN LOG] Location fetch timed out after 5 seconds');
-            resolve({ location: null, ispName: null });
-          }, 5000);
-        })
-      ]);
-      location = locationInfo.location;
-      ispName = locationInfo.ispName;
-      if (location || ispName) {
-        console.log(`[LOGIN LOG] Location: ${location}, ISP: ${ispName}`);
-      } else {
-        console.warn(`[LOGIN LOG] No location/ISP data received for IP: ${ipAddress}`);
+    
+    if (userLocationFromBrowser && userLocationFromBrowser.address) {
+      // Use browser-provided location (most accurate - user's actual location)
+      location = userLocationFromBrowser.address;
+      console.log(`[LOGIN LOG] Using browser geolocation: ${location}`);
+      
+      // Still get ISP info from IP address
+      try {
+        const locationInfo = await Promise.race([
+          getIPLocation(ipAddress),
+          new Promise((resolve) => {
+            setTimeout(() => {
+              resolve({ location: null, ispName: null });
+            }, 3000);
+          })
+        ]);
+        ispName = locationInfo.ispName;
+        if (ispName) {
+          console.log(`[LOGIN LOG] ISP from IP: ${ispName}`);
+        }
+      } catch (error) {
+        console.warn('[LOGIN LOG] Failed to get ISP info:', error.message);
       }
-    } catch (error) {
-      console.error('[LOGIN LOG] Failed to get location info:', error.message);
-      console.error('[LOGIN LOG] Error details:', error);
+    } else {
+      // Priority 2: Fall back to IP-based location (less accurate)
+      try {
+        console.log(`[LOGIN LOG] Browser location not available, fetching location for IP: ${ipAddress}`);
+        const locationInfo = await Promise.race([
+          getIPLocation(ipAddress),
+          new Promise((resolve) => {
+            setTimeout(() => {
+              console.warn('[LOGIN LOG] Location fetch timed out after 5 seconds');
+              resolve({ location: null, ispName: null });
+            }, 5000);
+          })
+        ]);
+        location = locationInfo.location;
+        ispName = locationInfo.ispName;
+        if (location || ispName) {
+          console.log(`[LOGIN LOG] Location from IP: ${location}, ISP: ${ispName}`);
+        } else {
+          console.warn(`[LOGIN LOG] No location/ISP data received for IP: ${ipAddress}`);
+        }
+      } catch (error) {
+        console.error('[LOGIN LOG] Failed to get location info:', error.message);
+        console.error('[LOGIN LOG] Error details:', error);
+      }
     }
     
     const result = await hydrologyDB.query(
@@ -274,15 +299,18 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     console.log("[LOGIN] Login attempt received");
-    const { email, password, role } = req.body;
+    const { email, password, role, userLocation } = req.body;
     const ipAddress = await getClientIP(req);
     console.log(`[LOGIN] Email: ${email}, IP: ${ipAddress}, Requested Role: ${role}`);
+    if (userLocation) {
+      console.log(`[LOGIN] Browser location provided: ${userLocation.address || 'N/A'}`);
+    }
 
     const [user] = await usersDB.query("SELECT * FROM users WHERE email = ?", [email]);
     
     if (user.length === 0) {
       // Log failed login attempt
-      await logLoginAttempt(null, email, 'Unknown', 'Unknown', ipAddress, 'user', 'failed');
+      await logLoginAttempt(null, email, 'Unknown', 'Unknown', ipAddress, 'user', 'failed', userLocation);
       return res.status(400).json({ error: "Invalid credentials" });
     }
 
@@ -300,7 +328,7 @@ router.post("/login", async (req, res) => {
     if (selectedRoleLower !== actualRoleLower) {
       const fullName = `${dbUser.first_name || ''} ${dbUser.last_name || ''}`.trim() || 'Unknown';
       console.log(`[LOGIN] Role mismatch. Selected: "${selectedRole}", Actual: "${actualRole}"`);
-      await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, 'user', 'failed');
+      await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, 'user', 'failed', userLocation);
       return res.status(403).json({ error: `Access denied. Your role is "${actualRole}", but you selected "${selectedRole}". Please select the correct role.` });
     }
     
@@ -315,7 +343,7 @@ router.post("/login", async (req, res) => {
     if (!validPass) {
       // Log failed login attempt
       const fullName = `${dbUser.first_name || ''} ${dbUser.last_name || ''}`.trim() || 'Unknown';
-      await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, 'user', 'failed');
+      await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, 'user', 'failed', userLocation);
       return res.status(400).json({ error: "Invalid credentials" });
     }
 
@@ -323,7 +351,7 @@ router.post("/login", async (req, res) => {
     const fullName = `${dbUser.first_name || ''} ${dbUser.last_name || ''}`.trim() || 'Unknown';
     // If user selected admin role and is admin, log as admin login, otherwise user login
     const loginType = (role && role.toLowerCase() === 'admin' && dbUser.role && dbUser.role.toLowerCase() === 'admin') ? 'admin' : 'user';
-    await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, loginType, 'success');
+    await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, loginType, 'success', userLocation);
 
     const token = jwt.sign(
       { id: dbUser.id, role: dbUser.role },
@@ -356,16 +384,19 @@ router.post("/login", async (req, res) => {
 router.post("/admin-login", async (req, res) => {
   try {
     console.log("[ADMIN LOGIN] Admin login attempt received");
-    const { email, password } = req.body;
+    const { email, password, userLocation } = req.body;
     const ipAddress = await getClientIP(req);
     console.log(`[ADMIN LOGIN] Email: ${email}, IP: ${ipAddress}`);
+    if (userLocation) {
+      console.log(`[ADMIN LOGIN] Browser location provided: ${userLocation.address || 'N/A'}`);
+    }
 
     // First check if user exists
     const [userRows] = await usersDB.query("SELECT * FROM users WHERE email = ?", [email]);
     
     if (userRows.length === 0) {
       // Log failed admin login attempt
-      await logLoginAttempt(null, email, 'Unknown', 'admin', ipAddress, 'admin', 'failed');
+      await logLoginAttempt(null, email, 'Unknown', 'admin', ipAddress, 'admin', 'failed', userLocation);
       return res.status(403).json({ message: "Access denied. Invalid credentials" });
     }
 
@@ -381,7 +412,7 @@ router.post("/admin-login", async (req, res) => {
       // Log failed admin login attempt (non-admin trying to access admin login)
       const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown';
       console.log(`[ADMIN LOGIN] Access denied. User role: "${user.role}", Normalized: "${userRole}"`);
-      await logLoginAttempt(user.id, email, fullName, user.role, ipAddress, 'admin', 'failed');
+      await logLoginAttempt(user.id, email, fullName, user.role, ipAddress, 'admin', 'failed', userLocation);
       return res.status(403).json({ message: "Access denied. Not an admin" });
     }
     
@@ -403,7 +434,7 @@ router.post("/admin-login", async (req, res) => {
       // Log failed admin login attempt
       const fullName = `${admin.first_name || ''} ${admin.last_name || ''}`.trim() || 'Unknown';
       console.log(`[ADMIN LOGIN] Password mismatch. Login failed.`);
-      await logLoginAttempt(admin.id, email, fullName, admin.role, ipAddress, 'admin', 'failed');
+      await logLoginAttempt(admin.id, email, fullName, admin.role, ipAddress, 'admin', 'failed', userLocation);
       return res.status(400).json({ message: "Invalid credentials" });
     }
     
@@ -411,7 +442,7 @@ router.post("/admin-login", async (req, res) => {
 
     // Log successful admin login
     const fullName = `${admin.first_name || ''} ${admin.last_name || ''}`.trim() || 'Unknown';
-    await logLoginAttempt(admin.id, email, fullName, admin.role, ipAddress, 'admin', 'success');
+    await logLoginAttempt(admin.id, email, fullName, admin.role, ipAddress, 'admin', 'success', userLocation);
 
     const token = jwt.sign(
       { id: admin.id, role: admin.role },

@@ -54,6 +54,79 @@ export default function Login() {
     }
   };
 
+  // Get user's location using browser Geolocation API
+  const getUserLocation = () => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        console.warn('Geolocation is not supported by this browser');
+        resolve(null);
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          };
+          console.log('User location obtained:', location);
+          resolve(location);
+        },
+        (error) => {
+          console.warn('Geolocation error:', error.message);
+          resolve(null);
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: 5000,
+          maximumAge: 0
+        }
+      );
+    });
+  };
+
+  // Reverse geocode coordinates to get address
+  const getLocationFromCoordinates = async (lat, lng) => {
+    try {
+      // Using OpenStreetMap Nominatim API (free, no API key required)
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+        {
+          headers: {
+            'User-Agent': 'Hydrology-Monitoring-System'
+          }
+        }
+      );
+      const data = await response.json();
+      
+      if (data && data.address) {
+        const addr = data.address;
+        const locationParts = [];
+        if (addr.city || addr.town || addr.village) {
+          locationParts.push(addr.city || addr.town || addr.village);
+        }
+        if (addr.state_district || addr.district) {
+          locationParts.push(addr.state_district || addr.district);
+        }
+        if (addr.state) {
+          locationParts.push(addr.state);
+        }
+        if (addr.country) {
+          locationParts.push(addr.country);
+        }
+        if (addr.postcode) {
+          locationParts[locationParts.length - 1] = `${locationParts[locationParts.length - 1]} ${addr.postcode}`;
+        }
+        return locationParts.length > 0 ? locationParts.join(', ') : null;
+      }
+      return null;
+    } catch (error) {
+      console.warn('Reverse geocoding failed:', error);
+      return null;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -63,6 +136,25 @@ export default function Login() {
     }
 
     setIsLoading(true);
+    
+    // Get user's location from browser
+    let userLocation = null;
+    let userLocationString = null;
+    try {
+      const geoLocation = await getUserLocation();
+      if (geoLocation) {
+        userLocationString = await getLocationFromCoordinates(geoLocation.latitude, geoLocation.longitude);
+        if (userLocationString) {
+          userLocation = {
+            latitude: geoLocation.latitude,
+            longitude: geoLocation.longitude,
+            address: userLocationString
+          };
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to get user location:', error);
+    }
 
     try {
       // Pre-wake backend before login to prevent sleep issues
