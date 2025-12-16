@@ -72,8 +72,8 @@ const MinimalOrbs = () => (
 
 export default function TrendsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   
-  // Read URL parameters
   // Initialize from URL parameters
   const getInitialState = () => {
     if (typeof window !== 'undefined') {
@@ -91,38 +91,20 @@ export default function TrendsPage() {
   const [selectedStation, setSelectedStation] = useState(() => getInitialState().station);
   const [selectedParameter, setSelectedParameter] = useState(() => getInitialState().parameter);
   
-  // Update state when URL changes
+  // Update state when URL parameters change
   useEffect(() => {
-    const handlePopState = () => {
-      if (typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location.search);
-        const type = params.get('type');
-        const station = params.get('station');
-        const parameter = params.get('parameter');
-        
-        if (type) setSelectedType(type);
-        if (station) setSelectedStation(station);
+    if (searchParams) {
+      const type = searchParams.get('type');
+      const station = searchParams.get('station');
+      const parameter = searchParams.get('parameter');
+      
+      if (type && type !== selectedType) setSelectedType(type);
+      if (station && station !== selectedStation) setSelectedStation(station);
+      if (parameter !== selectedParameter) {
         setSelectedParameter(parameter);
       }
-    };
-    
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
-  
-  // Also check URL on mount and when router changes
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const type = params.get('type');
-      const station = params.get('station');
-      const parameter = params.get('parameter');
-      
-      if (type) setSelectedType(type);
-      if (station) setSelectedStation(station);
-      if (parameter !== null) setSelectedParameter(parameter);
     }
-  }, [router]);
+  }, [searchParams, selectedType, selectedStation, selectedParameter]);
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
