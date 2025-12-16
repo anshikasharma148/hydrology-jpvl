@@ -292,8 +292,20 @@ export default function Dashboard() {
   // format date/time as "24 Nov 2025, 12:30 PM" (no device id)
   const formatDateTime = (ts) => {
     if (!ts) return null;
-    // Remove the timezone indicator "Z" so browser doesn't convert UTC → local time.
-    const clean = ts.replace("Z", "");
+    // MySQL DATETIME format is "YYYY-MM-DD HH:MM:SS" (no timezone)
+    // Treat it as local sensor time (not UTC)
+    let clean = ts;
+    if (typeof ts === 'string') {
+      // Remove "Z" if present (from ISO format)
+      clean = ts.replace("Z", "");
+      // If it's MySQL DATETIME format (YYYY-MM-DD HH:MM:SS), add "T" to make it parseable
+      if (clean.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)) {
+        clean = clean.replace(" ", "T");
+      }
+    } else if (ts instanceof Date) {
+      // If it's already a Date object, convert to ISO string and remove Z
+      clean = ts.toISOString().replace("Z", "");
+    }
     // Create date as if the timestamp is already local sensor time
     const d = new Date(clean);
     if (isNaN(d.getTime())) {

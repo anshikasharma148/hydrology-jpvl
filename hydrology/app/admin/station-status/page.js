@@ -182,15 +182,35 @@ export default function StationStatusManagement() {
 
   const formatTimestamp = (ts) => {
     if (!ts) return null;
-    const d = new Date(ts);
-    return d.toLocaleString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
+    // MySQL DATETIME format is "YYYY-MM-DD HH:MM:SS" (no timezone)
+    // Treat it as local sensor time (not UTC)
+    let clean = ts;
+    if (typeof ts === 'string') {
+      // Remove "Z" if present (from ISO format)
+      clean = ts.replace("Z", "");
+      // If it's MySQL DATETIME format (YYYY-MM-DD HH:MM:SS), add "T" to make it parseable
+      if (clean.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)) {
+        clean = clean.replace(" ", "T");
+      }
+    } else if (ts instanceof Date) {
+      // If it's already a Date object, convert to ISO string and remove Z
+      clean = ts.toISOString().replace("Z", "");
+    }
+    // Create date as if the timestamp is already local sensor time
+    const d = new Date(clean);
+    if (isNaN(d.getTime())) {
+      console.warn("Failed to parse timestamp:", ts);
+      return null;
+    }
+    const year = d.getFullYear();
+    const month = d.toLocaleString("en-GB", { month: "short" });
+    const day = String(d.getDate()).padStart(2, "0");
+    let hour = d.getHours();
+    const minute = String(d.getMinutes()).padStart(2, "0");
+    const ampm = hour >= 12 ? "PM" : "AM";
+    const hour12 = hour % 12 || 12;
+    
+    return `${day} ${month} ${year}, ${hour12}:${minute} ${ampm}`;
   };
 
   const handleLogout = () => {

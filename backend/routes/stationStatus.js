@@ -80,7 +80,20 @@ router.post("/", async (req, res) => {
       [stationId, serviceType]
     );
 
-    const statusTimestamp = status.toLowerCase() === "offline" ? new Date() : null;
+    // Store timestamp in MySQL DATETIME format (YYYY-MM-DD HH:MM:SS)
+    // This will be stored as local server time and retrieved as-is
+    // Both frontend components will treat it as local sensor time
+    let statusTimestamp = null;
+    if (status.toLowerCase() === "offline") {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      statusTimestamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    }
 
     if (existing.length > 0) {
       // Update existing record
