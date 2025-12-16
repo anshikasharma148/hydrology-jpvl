@@ -241,13 +241,21 @@ router.post("/admin-login", async (req, res) => {
 
     const user = userRows[0];
     
+    // Debug: Log the actual role value
+    console.log(`[ADMIN LOGIN] User found. Role in DB: "${user.role}" (type: ${typeof user.role})`);
+    
     // Security: Only allow users with admin role to use admin login
-    if (!user.role || user.role.toLowerCase() !== 'admin') {
+    // Trim and normalize the role for comparison
+    const userRole = user.role ? user.role.toString().trim().toLowerCase() : '';
+    if (!userRole || userRole !== 'admin') {
       // Log failed admin login attempt (non-admin trying to access admin login)
       const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown';
+      console.log(`[ADMIN LOGIN] Access denied. User role: "${user.role}", Normalized: "${userRole}"`);
       await logLoginAttempt(user.id, email, fullName, user.role, ipAddress, 'admin', 'failed');
       return res.status(403).json({ message: "Access denied. Not an admin" });
     }
+    
+    console.log(`[ADMIN LOGIN] Role validation passed. Proceeding with password check.`);
 
     const admin = user;
 
