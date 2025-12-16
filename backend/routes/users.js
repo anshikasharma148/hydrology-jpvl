@@ -66,7 +66,8 @@ const getIPLocation = async (ipAddress) => {
         reject(new Error('Timeout'));
       }, 4000);
       // Using ip-api.com free service (HTTP only for free tier, no API key required)
-      const url = `http://ip-api.com/json/${ipAddress}?fields=status,message,country,regionName,city,isp,org`;
+      // Requesting additional fields: as (AS number and name), query (IP), timezone, district, zip
+      const url = `http://ip-api.com/json/${ipAddress}?fields=status,message,country,regionName,city,district,zip,timezone,isp,org,as,asname,query`;
       console.log(`[IP Location] Requesting: ${url}`);
       http.get(url, (res) => {
         let data = '';
@@ -77,14 +78,33 @@ const getIPLocation = async (ipAddress) => {
             const json = JSON.parse(data);
             console.log(`[IP Location] Response for ${ipAddress}:`, JSON.stringify(json));
             if (json.status === 'success') {
-              // Format: City, Region, Country
+              // Format: City, District (if available), Region, Country
               const locationParts = [];
               if (json.city) locationParts.push(json.city);
+              if (json.district) locationParts.push(json.district);
               if (json.regionName) locationParts.push(json.regionName);
               if (json.country) locationParts.push(json.country);
+              // Add zip code if available
+              if (json.zip) {
+                locationParts[locationParts.length - 1] = `${locationParts[locationParts.length - 1]} ${json.zip}`;
+              }
               const location = locationParts.length > 0 ? locationParts.join(', ') : null;
-              const ispName = json.isp || json.org || null;
-              console.log(`[IP Location] Parsed - Location: ${location}, ISP: ${ispName}`);
+              
+              // Build ISP/Router name with more details
+              // Combine ISP, Organization, and AS name for more complete information
+              const ispParts = [];
+              if (json.isp) ispParts.push(json.isp);
+              if (json.org && json.org !== json.isp) {
+                // Only add org if it's different from ISP
+                ispParts.push(`(${json.org})`);
+              }
+              if (json.asname && !json.isp.includes(json.asname) && !json.org?.includes(json.asname)) {
+                // Add AS name if it provides additional info
+                ispParts.push(`[${json.asname}]`);
+              }
+              const ispName = ispParts.length > 0 ? ispParts.join(' ') : null;
+              
+              console.log(`[IP Location] Parsed - Location: ${location}, ISP/Router: ${ispName}`);
               resolve({ location, ispName });
             } else {
               console.warn(`[IP Location] API returned status: ${json.status}, message: ${json.message || 'N/A'}`);
