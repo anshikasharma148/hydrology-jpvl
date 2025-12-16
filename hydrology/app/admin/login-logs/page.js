@@ -257,13 +257,15 @@ export default function LoginLogsPage() {
                   <th className="px-6 py-4 text-left text-sm font-semibold">Role</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold">Login Type</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold">IP Address</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold">Location</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold">ISP/Router</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {logs.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan="9" className="px-6 py-12 text-center text-gray-500">
                       No login logs found
                     </td>
                   </tr>
@@ -305,6 +307,12 @@ export default function LoginLogsPage() {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700 font-mono">
                         {log.ip_address}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-700">
+                        {log.location || '--'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-700">
+                        {log.isp_name || '--'}
                       </td>
                       <td className="px-6 py-4 text-sm">
                         <span className={`px-2 py-1 rounded-full text-xs font-semibold ${

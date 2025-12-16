@@ -50,14 +50,99 @@ const getClientIP = async (req) => {
   return ip;
 };
 
+// Helper function to get location and ISP info from IP address
+const getIPLocation = async (ipAddress) => {
+  // Skip if IP is unknown or localhost
+  if (!ipAddress || ipAddress === 'Unknown' || ipAddress === '127.0.0.1' || ipAddress.startsWith('192.168.') || ipAddress.startsWith('10.') || ipAddress.startsWith('172.')) {
+    return { location: null, ispName: null };
+  }
+
+  try {
+    const https = require('https');
+    console.log(`[IP Location] Fetching location data for IP: ${ipAddress}`);
+    const locationData = await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        console.warn(`[IP Location] Request timeout for IP: ${ipAddress}`);
+        reject(new Error('Timeout'));
+      }, 3000);
+      // Using ip-api.com free service (no API key required)
+      const url = `https://ip-api.com/json/${ipAddress}?fields=status,message,country,regionName,city,isp,org`;
+      console.log(`[IP Location] Requesting: ${url}`);
+      https.get(url, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          clearTimeout(timeout);
+          try {
+            const json = JSON.parse(data);
+            console.log(`[IP Location] Response for ${ipAddress}:`, JSON.stringify(json));
+            if (json.status === 'success') {
+              // Format: City, Region, Country
+              const locationParts = [];
+              if (json.city) locationParts.push(json.city);
+              if (json.regionName) locationParts.push(json.regionName);
+              if (json.country) locationParts.push(json.country);
+              const location = locationParts.length > 0 ? locationParts.join(', ') : null;
+              const ispName = json.isp || json.org || null;
+              console.log(`[IP Location] Parsed - Location: ${location}, ISP: ${ispName}`);
+              resolve({ location, ispName });
+            } else {
+              console.warn(`[IP Location] API returned status: ${json.status}, message: ${json.message || 'N/A'}`);
+              resolve({ location: null, ispName: null });
+            }
+          } catch (e) {
+            console.error(`[IP Location] JSON parse error:`, e.message);
+            reject(e);
+          }
+        });
+      }).on('error', (err) => {
+        clearTimeout(timeout);
+        console.error(`[IP Location] HTTP request error:`, err.message);
+        reject(err);
+      });
+    });
+    return locationData;
+  } catch (error) {
+    console.error('[IP Location] Failed to get location for IP:', ipAddress, error.message);
+    return { location: null, ispName: null };
+  }
+};
+
 // Helper function to log login attempt
 const logLoginAttempt = async (userId, email, name, role, ipAddress, loginType, status) => {
   try {
     console.log(`[LOGIN LOG] Attempting to log: ${email}, ${name}, ${role}, ${ipAddress}, ${loginType}, ${status}`);
+    
+    // Get location and ISP info (non-blocking - don't wait if it takes too long)
+    let location = null;
+    let ispName = null;
+    try {
+      console.log(`[LOGIN LOG] Fetching location for IP: ${ipAddress}`);
+      const locationInfo = await Promise.race([
+        getIPLocation(ipAddress),
+        new Promise((resolve) => {
+          setTimeout(() => {
+            console.warn('[LOGIN LOG] Location fetch timed out after 2 seconds');
+            resolve({ location: null, ispName: null });
+          }, 2000);
+        })
+      ]);
+      location = locationInfo.location;
+      ispName = locationInfo.ispName;
+      if (location || ispName) {
+        console.log(`[LOGIN LOG] Location: ${location}, ISP: ${ispName}`);
+      } else {
+        console.warn(`[LOGIN LOG] No location/ISP data received for IP: ${ipAddress}`);
+      }
+    } catch (error) {
+      console.error('[LOGIN LOG] Failed to get location info:', error.message);
+      console.error('[LOGIN LOG] Error details:', error);
+    }
+    
     const result = await hydrologyDB.query(
-      `INSERT INTO login_logs (user_id, email, name, role, ip_address, login_type, login_status, login_timestamp)
-       VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [userId, email, name, role, ipAddress, loginType, status]
+      `INSERT INTO login_logs (user_id, email, name, role, ip_address, login_type, login_status, location, isp_name, login_timestamp)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [userId, email, name, role, ipAddress, loginType, status, location, ispName]
     );
     console.log(`[LOGIN LOG] Successfully logged login attempt. Insert ID: ${result[0]?.insertId || 'N/A'}`);
   } catch (error) {
