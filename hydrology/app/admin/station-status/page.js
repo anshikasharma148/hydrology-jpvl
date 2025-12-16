@@ -1,17 +1,24 @@
 'use client';
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 
 // Station configuration
 const STATIONS = [
-  { id: "ST015", name: "Lambagad/Barrage", serviceType: "AWS" },
-  { id: "ST019", name: "Mana", serviceType: "AWS" },
-  { id: "ST020", name: "Vasudhara", serviceType: "AWS" },
-  { id: "ST019", name: "Mana", serviceType: "EWS" },
-  { id: "ST020", name: "Vasudhara", serviceType: "EWS" },
+  { id: "ST015", name: "Lambagad/Barrage", serviceType: "AWS", icon: "🌡️" },
+  { id: "ST019", name: "Mana", serviceType: "AWS", icon: "🌡️" },
+  { id: "ST020", name: "Vasudhara", serviceType: "AWS", icon: "🌡️" },
+  { id: "ST019", name: "Mana", serviceType: "EWS", icon: "💧" },
+  { id: "ST020", name: "Vasudhara", serviceType: "EWS", icon: "💧" },
 ];
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://hydrology-jpvl.onrender.com";
+// Get backend URL - use localhost if running locally, otherwise use Render
+const getBackendUrl = () => {
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+  }
+  return process.env.NEXT_PUBLIC_BACKEND_URL || "https://hydrology-jpvl.onrender.com";
+};
 
 export default function StationStatusManagement() {
   const router = useRouter();
@@ -19,6 +26,7 @@ export default function StationStatusManagement() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState({});
   const [adminName, setAdminName] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -35,7 +43,8 @@ export default function StationStatusManagement() {
 
   const fetchStatuses = async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/station-status`);
+      const backendUrl = getBackendUrl();
+      const response = await fetch(`${backendUrl}/api/station-status`);
       const result = await response.json();
       if (result.success) {
         const statusMap = {};
@@ -52,12 +61,18 @@ export default function StationStatusManagement() {
     }
   };
 
+  const showSuccess = (message) => {
+    setSuccessMessage(message);
+    setTimeout(() => setSuccessMessage(""), 3000);
+  };
+
   const handleStatusChange = async (stationId, serviceType, newStatus) => {
     const key = `${stationId}_${serviceType}`;
     setSaving({ ...saving, [key]: true });
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/station-status`, {
+      const backendUrl = getBackendUrl();
+      const response = await fetch(`${backendUrl}/api/station-status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -69,7 +84,8 @@ export default function StationStatusManagement() {
 
       const result = await response.json();
       if (result.success) {
-        await fetchStatuses(); // Refresh statuses
+        await fetchStatuses();
+        showSuccess(`Status updated to ${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}`);
       } else {
         alert(`Error: ${result.error || "Failed to update status"}`);
       }
@@ -90,14 +106,16 @@ export default function StationStatusManagement() {
     setSaving({ ...saving, [key]: true });
 
     try {
+      const backendUrl = getBackendUrl();
       const response = await fetch(
-        `${BACKEND_URL}/api/station-status/${stationId}?serviceType=${serviceType}`,
+        `${backendUrl}/api/station-status/${stationId}?serviceType=${serviceType}`,
         { method: "DELETE" }
       );
 
       const result = await response.json();
       if (result.success) {
-        await fetchStatuses(); // Refresh statuses
+        await fetchStatuses();
+        showSuccess("Manual status removed successfully");
       } else {
         alert(`Error: ${result.error || "Failed to remove status"}`);
       }
@@ -139,164 +157,316 @@ export default function StationStatusManagement() {
     window.location.href = "/admin/login";
   };
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "live":
+        return "from-green-500 to-emerald-600";
+      case "offline":
+        return "from-red-500 to-rose-600";
+      case "maintenance":
+        return "from-yellow-500 to-amber-600";
+      default:
+        return "from-gray-400 to-gray-500";
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case "live":
+        return "✓";
+      case "offline":
+        return "●";
+      case "maintenance":
+        return "⚠";
+      default:
+        return "○";
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-100 via-blue-50 to-gray-200 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading station statuses...</p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center"
+        >
+          <div className="relative">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-indigo-200 border-t-indigo-600 mx-auto"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-400 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+          </div>
+          <p className="mt-6 text-gray-600 font-medium">Loading station statuses...</p>
+        </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-blue-50 to-gray-200 p-4 sm:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 p-4 sm:p-6">
+      {/* Success Message Toast */}
+      <AnimatePresence>
+        {successMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-xl flex items-center gap-3"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="font-medium">{successMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
-      <div className="max-w-6xl mx-auto mb-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="max-w-7xl mx-auto mb-8">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+        >
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Station Status Management</h1>
-            <p className="text-gray-600 mt-1">Manage manual status for AWS and EWS stations</p>
+            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              Station Status Management
+            </h1>
+            <p className="text-gray-600 mt-2 text-sm sm:text-base">Manage manual status for AWS and EWS stations</p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center bg-white/80 backdrop-blur-sm rounded-full py-2 px-4 shadow-sm border border-gray-200">
-              <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center mr-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center bg-white/90 backdrop-blur-sm rounded-full py-2 px-4 shadow-md border border-gray-200/50">
+              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center mr-2 shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
-              <span className="text-sm font-medium text-gray-700">Hi, {adminName}</span>
+              <span className="text-sm font-semibold text-gray-700">Hi, {adminName}</span>
             </div>
             <button
               onClick={() => router.push("/admin")}
-              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-gray-700 font-medium transition-colors"
+              className="px-5 py-2.5 bg-white hover:bg-gray-50 rounded-lg text-gray-700 font-medium transition-all shadow-md hover:shadow-lg border border-gray-200"
             >
-              Back
+              ← Back
             </button>
             <button
               onClick={handleLogout}
-              className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors"
+              className="px-5 py-2.5 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg"
             >
               Logout
             </button>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Info Box */}
-      <div className="max-w-6xl mx-auto mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="max-w-7xl mx-auto mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-xl p-5 shadow-lg"
+      >
         <div className="flex items-start">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <div className="text-sm text-blue-800">
-            <p className="font-semibold mb-1">Status Priority:</p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li><strong>Under Maintenance:</strong> All values shown as NIL</li>
-              <li><strong>Offline:</strong> Shows timestamp when set to Offline</li>
-              <li><strong>Live:</strong> Shows data normally (if data received within 20-30 minutes)</li>
-              <li><strong>Auto-detection:</strong> If no manual status, automatically shows Offline if no data for 20+ minutes</li>
-            </ul>
+          <div className="flex-shrink-0">
+            <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+          <div className="ml-4 flex-1">
+            <h3 className="text-lg font-bold text-gray-800 mb-2">Status Priority Guide</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-700">
+              <div className="flex items-start gap-2">
+                <span className="text-yellow-600 font-bold">⚠</span>
+                <div>
+                  <strong className="text-yellow-700">Under Maintenance:</strong> All values shown as NIL
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-red-600 font-bold">●</span>
+                <div>
+                  <strong className="text-red-700">Offline:</strong> Shows timestamp when set to Offline
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-green-600 font-bold">✓</span>
+                <div>
+                  <strong className="text-green-700">Live:</strong> Shows data normally (if data received within 20-30 minutes)
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="text-gray-600 font-bold">○</span>
+                <div>
+                  <strong className="text-gray-700">Auto-detection:</strong> If no manual status, automatically shows Offline if no data for 20+ minutes
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Stations Grid */}
-      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {STATIONS.map((station) => {
+      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {STATIONS.map((station, index) => {
           const key = `${station.id}_${station.serviceType}`;
           const currentStatus = getCurrentStatus(station.id, station.serviceType);
           const statusTimestamp = getStatusTimestamp(station.id, station.serviceType);
           const isSaving = saving[key];
 
           return (
-            <div
+            <motion.div
               key={key}
-              className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 hover:shadow-xl transition-shadow"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200/50 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
             >
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">{station.name}</h3>
-                  <p className="text-sm text-gray-500">
-                    {station.serviceType} • {station.id}
-                  </p>
+              {/* Station Header */}
+              <div className="flex items-center justify-between mb-5 pb-4 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-2xl shadow-sm">
+                    {station.icon}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-800">{station.name}</h3>
+                    <p className="text-xs text-gray-500 font-medium">
+                      {station.serviceType} • {station.id}
+                    </p>
+                  </div>
                 </div>
                 {currentStatus && (
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      currentStatus === "live"
-                        ? "bg-green-100 text-green-700"
-                        : currentStatus === "offline"
-                        ? "bg-red-100 text-red-700"
-                        : "bg-yellow-100 text-yellow-700"
-                    }`}
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold text-white bg-gradient-to-r ${getStatusColor(currentStatus)} shadow-md`}
                   >
+                    <span className="mr-1">{getStatusIcon(currentStatus)}</span>
                     {currentStatus === "maintenance" ? "Maintenance" : currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)}
-                  </span>
+                  </motion.div>
                 )}
               </div>
 
+              {/* Offline Timestamp */}
               {currentStatus === "offline" && statusTimestamp && (
-                <div className="mb-4 p-2 bg-red-50 rounded text-xs text-red-700">
-                  <strong>Set Offline:</strong> {formatTimestamp(statusTimestamp)}
-                </div>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg"
+                >
+                  <div className="flex items-center gap-2 text-xs">
+                    <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <strong className="text-red-700">Set Offline:</strong>
+                      <p className="text-red-600 mt-0.5">{formatTimestamp(statusTimestamp)}</p>
+                    </div>
+                  </div>
+                </motion.div>
               )}
 
-              <div className="space-y-2">
+              {/* Action Buttons */}
+              <div className="space-y-2.5">
                 <button
                   onClick={() => handleStatusChange(station.id, station.serviceType, "live")}
                   disabled={isSaving || currentStatus === "live"}
-                  className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${
+                  className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-[1.02] ${
                     currentStatus === "live"
-                      ? "bg-green-500 text-white cursor-not-allowed"
-                      : "bg-green-100 text-green-700 hover:bg-green-200"
+                      ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white cursor-not-allowed"
+                      : "bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 hover:from-green-200 hover:to-emerald-200"
                   } ${isSaving ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
-                  {isSaving ? "Saving..." : "Set Live"}
+                  {isSaving ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                      Saving...
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Set Live
+                    </span>
+                  )}
                 </button>
 
                 <button
                   onClick={() => handleStatusChange(station.id, station.serviceType, "offline")}
                   disabled={isSaving || currentStatus === "offline"}
-                  className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${
+                  className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-[1.02] ${
                     currentStatus === "offline"
-                      ? "bg-red-500 text-white cursor-not-allowed"
-                      : "bg-red-100 text-red-700 hover:bg-red-200"
+                      ? "bg-gradient-to-r from-red-500 to-rose-600 text-white cursor-not-allowed"
+                      : "bg-gradient-to-r from-red-100 to-rose-100 text-red-700 hover:from-red-200 hover:to-rose-200"
                   } ${isSaving ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
-                  {isSaving ? "Saving..." : "Set Offline"}
+                  {isSaving ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                      Saving...
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      Set Offline
+                    </span>
+                  )}
                 </button>
 
                 <button
                   onClick={() => handleStatusChange(station.id, station.serviceType, "maintenance")}
                   disabled={isSaving || currentStatus === "maintenance"}
-                  className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${
+                  className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-[1.02] ${
                     currentStatus === "maintenance"
-                      ? "bg-yellow-500 text-white cursor-not-allowed"
-                      : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                      ? "bg-gradient-to-r from-yellow-500 to-amber-600 text-white cursor-not-allowed"
+                      : "bg-gradient-to-r from-yellow-100 to-amber-100 text-yellow-700 hover:from-yellow-200 hover:to-amber-200"
                   } ${isSaving ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
-                  {isSaving ? "Saving..." : "Set Under Maintenance"}
+                  {isSaving ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                      Saving...
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      Set Under Maintenance
+                    </span>
+                  )}
                 </button>
 
                 {currentStatus && (
                   <button
                     onClick={() => handleRemoveStatus(station.id, station.serviceType)}
                     disabled={isSaving}
-                    className={`w-full py-2 px-4 rounded-lg font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200 ${
+                    className={`w-full py-2.5 px-4 rounded-xl font-medium transition-all duration-200 bg-gray-100 text-gray-700 hover:bg-gray-200 shadow-sm hover:shadow-md ${
                       isSaving ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                   >
-                    {isSaving ? "Removing..." : "Remove Manual Status"}
+                    {isSaving ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                        Removing...
+                      </span>
+                    ) : (
+                      <span className="flex items-center justify-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Remove Manual Status
+                      </span>
+                    )}
                   </button>
                 )}
               </div>
-            </div>
+            </motion.div>
           );
         })}
       </div>
     </div>
   );
 }
-

@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, Polyline } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { useStationStatus } from "../hooks/useStationStatus";
 import {
   Thermometer,
   Droplets,
@@ -85,6 +86,14 @@ const FreshSensorMap = () => {
   const [awsData, setAwsData] = useState({});
   const [ewsData, setEwsData] = useState({});
   const [loading, setLoading] = useState(true);
+  const { getStationStatus } = useStationStatus();
+  
+  // Station ID mapping
+  const STATION_ID_MAP = {
+    "mana": "ST019",
+    "vasudhara": "ST020",
+    "barrage": "ST015",
+  };
 
   const stations = [
     {
@@ -266,7 +275,7 @@ const FreshSensorMap = () => {
                       >
                         {s.name}
                       </div>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <div 
                           className="w-1.5 h-1.5 rounded-full"
                           style={{ background: aws ? '#10b981' : '#6b7280' }}
@@ -277,6 +286,38 @@ const FreshSensorMap = () => {
                         >
                           {s.hasEws ? "AWS + EWS" : "AWS"}
                       </span>
+                      {(() => {
+                        const stationId = STATION_ID_MAP[s.key];
+                        if (!stationId) return null;
+                        const awsStatus = aws ? getStationStatus(stationId, "AWS", aws.timestamp, 30) : null;
+                        const ewsStatus = ews ? getStationStatus(stationId, "EWS", ews.timestamp, 20) : null;
+                        return (
+                          <>
+                            {awsStatus && (
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                awsStatus.status === "maintenance"
+                                  ? "bg-yellow-500/20 text-yellow-300 border border-yellow-500/50"
+                                  : awsStatus.status === "offline"
+                                  ? "bg-red-500/20 text-red-300 border border-red-500/50"
+                                  : "bg-green-500/20 text-green-300 border border-green-500/50"
+                              }`}>
+                                AWS: {awsStatus.status === "maintenance" ? "⚠" : awsStatus.status === "offline" ? "●" : "✓"}
+                              </span>
+                            )}
+                            {ewsStatus && (
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                ewsStatus.status === "maintenance"
+                                  ? "bg-yellow-500/20 text-yellow-300 border border-yellow-500/50"
+                                  : ewsStatus.status === "offline"
+                                  ? "bg-red-500/20 text-red-300 border border-red-500/50"
+                                  : "bg-green-500/20 text-green-300 border border-green-500/50"
+                              }`}>
+                                EWS: {ewsStatus.status === "maintenance" ? "⚠" : ewsStatus.status === "offline" ? "●" : "✓"}
+                              </span>
+                            )}
+                          </>
+                        );
+                      })()}
                       </div>
                     </div>
                   </div>

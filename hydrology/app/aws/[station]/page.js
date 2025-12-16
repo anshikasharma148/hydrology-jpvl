@@ -8,6 +8,7 @@ import { motion } from 'framer-motion';
 import Navbar from '../../../components/Navbar';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
+import { useStationStatus } from '../../../hooks/useStationStatus';
 import {
   WiHumidity,
   WiBarometer,
@@ -158,6 +159,17 @@ export default function StationPage() {
   const [isCelsius, setIsCelsius] = useState(true);
   const [isDesktop, setIsDesktop] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const { getStationStatus } = useStationStatus();
+  
+  // Station ID mapping
+  const STATION_ID_MAP = {
+    "mana": "ST019",
+    "lambagad": "ST015",
+    "barrage": "ST015",
+    "vasudhara": "ST020",
+  };
+  
+  const stationId = STATION_ID_MAP[stationKey] || null;
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -251,9 +263,18 @@ else if (stationKey === 'vasudhara') stationArr = json.data.Vasudhara;
     );
   };
 
+  // Get station status
+  const statusInfo = getStationStatus(stationId, "AWS", liveData?.timestamp || data[0]?.rawTimestamp, 20);
+  const isMaintenance = statusInfo.status === "maintenance";
+  
   // Remove the timezone indicator "Z" so browser doesn't convert UTC → local time.
   const cleanTimestamp = liveData?.timestamp ? liveData.timestamp.replace("Z", "") : null;
-  const displayTime = cleanTimestamp ? new Date(cleanTimestamp) : currentTime;
+  let displayTime = cleanTimestamp ? new Date(cleanTimestamp) : currentTime;
+  
+  // If manually set to offline, use offline timestamp
+  if (statusInfo.status === "offline" && statusInfo.offlineTimestamp) {
+    displayTime = new Date(statusInfo.offlineTimestamp);
+  }
   
   const formattedDate = displayTime.toLocaleDateString('en-GB', {
     weekday: 'long',
@@ -265,6 +286,13 @@ else if (stationKey === 'vasudhara') stationArr = json.data.Vasudhara;
     minute: '2-digit',
     hour12: true,
   });
+  
+  // Format value with maintenance check
+  const formatValue = (value, suffix = "") => {
+    if (isMaintenance) return "NIL";
+    if (value === null || value === undefined || value === "") return "--";
+    return `${value}${suffix}`;
+  };
 
   const temperatureValue =
     liveData && isCelsius
@@ -306,21 +334,39 @@ else if (stationKey === 'vasudhara') stationArr = json.data.Vasudhara;
               {stationDisplay}
             </h1>
 
-            <div className="text-base md:text-xl text-gray-700 font-semibold">{stateName}</div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="text-base md:text-xl text-gray-700 font-semibold">{stateName}</div>
+              {/* Status Badge */}
+              {statusInfo.status === "maintenance" && (
+                <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold border border-yellow-300">
+                  ⚠ Under Maintenance
+                </span>
+              )}
+              {statusInfo.status === "offline" && (
+                <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold border border-red-300">
+                  ● Offline
+                </span>
+              )}
+              {statusInfo.status === "live" && (
+                <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold border border-green-300 animate-pulse">
+                  ✓ Live
+                </span>
+              )}
+            </div>
             <div className="text-sm md:text-md text-gray-600 font-medium">{formattedDate}, {formattedTime}</div>
 
             {liveData && (
               <div className="w-full flex flex-wrap justify-center sm:justify-start gap-2 mt-4">
                 {[
-                  { icon: <WiDaySunny />, label: 'Temperature', value: `${liveData.Temperature}°C`, color: colors.Temperature },
-                  { icon: <WiHumidity />, label: 'Humidity', value: `${liveData.Humidity}%`, color: colors.Humidity },
-                  { icon: <WiBarometer />, label: 'Pressure', value: `${liveData.Pressure} hPa`, color: colors.Pressure },
-                  { icon: <WiStrongWind />, label: 'Wind', value: `${liveData.Wind} m/s`, color: colors.Wind },
-                  { icon: <WiRaindrop />, label: 'Rain', value: `${liveData.Rain} mm`, color: colors.Rain },
-                  { icon: <WiRaindrop />, label: 'Precipitation', value: `${liveData.Precipitation} mm`, color: colors.Precipitation },
-                  { icon: <GiSolarPower />, label: 'Solar Radiation', value: `${liveData.SolarRadiation} W/m²`, color: colors['Solar Radiation'] },
-                  { icon: <GiSolarPower />, label: 'Avg Solar Radiation', value: `${liveData.AvgSolarRadiation} W/m²`, color: colors['Avg Solar Radiation'] },
-                  { icon: <GiWeight />, label: 'Bucket Weight', value: `${liveData.BucketWeight} gm`, color: colors['Bucket Weight'] },
+                  { icon: <WiDaySunny />, label: 'Temperature', value: formatValue(liveData.Temperature, '°C'), color: colors.Temperature },
+                  { icon: <WiHumidity />, label: 'Humidity', value: formatValue(liveData.Humidity, '%'), color: colors.Humidity },
+                  { icon: <WiBarometer />, label: 'Pressure', value: formatValue(liveData.Pressure, ' hPa'), color: colors.Pressure },
+                  { icon: <WiStrongWind />, label: 'Wind', value: formatValue(liveData.Wind, ' m/s'), color: colors.Wind },
+                  { icon: <WiRaindrop />, label: 'Rain', value: formatValue(liveData.Rain, ' mm'), color: colors.Rain },
+                  { icon: <WiRaindrop />, label: 'Precipitation', value: formatValue(liveData.Precipitation, ' mm'), color: colors.Precipitation },
+                  { icon: <GiSolarPower />, label: 'Solar Radiation', value: formatValue(liveData.SolarRadiation, ' W/m²'), color: colors['Solar Radiation'] },
+                  { icon: <GiSolarPower />, label: 'Avg Solar Radiation', value: formatValue(liveData.AvgSolarRadiation, ' W/m²'), color: colors['Avg Solar Radiation'] },
+                  { icon: <GiWeight />, label: 'Bucket Weight', value: formatValue(liveData.BucketWeight, ' gm'), color: colors['Bucket Weight'] },
                 ].map(({ icon, label, value, color }, index) => (
                   <div
                     key={index}

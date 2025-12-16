@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-  "build": "next build",
-  "export": "next build",  
-  "start": "next start",
-  "lint": "next lint"
+    "build": "next build",
+    "export": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
     "@fortawesome/react-fontawesome": "^3.0.2",
@@ -23,7 +23,7 @@
     "date-fns": "^4.1.0",
     "echarts": "^5.6.0",
     "echarts-for-react": "^3.0.2",
-    "framer-motion": "^12.6.5",
+    "framer-motion": "^12.23.26",
     "js-cookie": "^3.0.5",
     "jspdf": "^3.0.3",
     "jspdf-autotable": "^5.0.2",

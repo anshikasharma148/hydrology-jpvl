@@ -8,6 +8,7 @@ import {
 import Navbar from 'components/Navbar';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
+import { useStationStatus } from '../../hooks/useStationStatus';
 
 const ReportsDashboard = () => {
   const router = useRouter();
@@ -37,6 +38,14 @@ const ReportsDashboard = () => {
   const [error, setError] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const { getStationStatus } = useStationStatus();
+  
+  // Station ID mapping
+  const STATION_ID_MAP = {
+    "vasudhara": "ST020",
+    "mana": "ST019",
+    "vishnu_prayag": "ST015",
+  };
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -638,6 +647,22 @@ const ReportsDashboard = () => {
                       {stationType}
                     </span>
                     {' '}: {ewsStations.concat(awsStations).find(s => s.slug === selectedStation)?.name}
+                    {(() => {
+                      const stationId = STATION_ID_MAP[selectedStation];
+                      if (!stationId) return null;
+                      const statusInfo = getStationStatus(stationId, stationType, filteredData[0]?.timestamp || data[0]?.timestamp, stationType === "EWS" ? 20 : 30);
+                      return (
+                        <span className={`ml-3 px-2 py-1 rounded-full text-xs font-bold ${
+                          statusInfo.status === "maintenance"
+                            ? "bg-yellow-100 text-yellow-700 border border-yellow-300"
+                            : statusInfo.status === "offline"
+                            ? "bg-red-100 text-red-700 border border-red-300"
+                            : "bg-green-100 text-green-700 border border-green-300"
+                        }`}>
+                          {statusInfo.status === "maintenance" ? "⚠ Maintenance" : statusInfo.status === "offline" ? "● Offline" : "✓ Live"}
+                        </span>
+                      );
+                    })()}
                   </span>
                 ) : (
                   <span className="text-gray-500">Select a station to view data</span>
@@ -698,11 +723,25 @@ const ReportsDashboard = () => {
                           index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                         }`}
                       >
-                        {Object.values(row).map((value, i) => (
-                          <td key={i} className="px-4 sm:px-6 py-3 sm:py-4 whitespace-normal sm:whitespace-nowrap text-sm font-medium text-gray-700">
-                            {typeof value === 'object' ? JSON.stringify(value) : (value ?? '-')}
-                          </td>
-                        ))}
+                        {Object.values(row).map((value, i) => {
+                          // Check if maintenance status - show NIL for numeric values
+                          const stationId = STATION_ID_MAP[selectedStation];
+                          const statusInfo = stationId ? getStationStatus(stationId, stationType, row.timestamp || data[0]?.timestamp, stationType === "EWS" ? 20 : 30) : null;
+                          const isMaintenance = statusInfo?.status === "maintenance";
+                          const displayValue = (() => {
+                            if (typeof value === 'object') return JSON.stringify(value);
+                            if (value === null || value === undefined) return '-';
+                            // If maintenance and value is numeric, show NIL
+                            if (isMaintenance && typeof value === 'number') return 'NIL';
+                            if (isMaintenance && !isNaN(parseFloat(value))) return 'NIL';
+                            return value;
+                          })();
+                          return (
+                            <td key={i} className="px-4 sm:px-6 py-3 sm:py-4 whitespace-normal sm:whitespace-nowrap text-sm font-medium text-gray-700">
+                              {displayValue}
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))}
                   </tbody>

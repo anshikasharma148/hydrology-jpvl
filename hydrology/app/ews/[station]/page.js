@@ -5,6 +5,7 @@ import Navbar from "../../../components/Navbar";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Thermometer, Battery, BatteryCharging, Zap, Sun, Activity, Ruler } from "lucide-react";
+import { useStationStatus } from "../../../hooks/useStationStatus";
 
 import {
   FaWater,
@@ -30,6 +31,15 @@ export default function StationPage() {
   const [showHeading, setShowHeading] = useState(false);
   const [latestData, setLatestData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { getStationStatus } = useStationStatus();
+  
+  // Station ID mapping
+  const STATION_ID_MAP = {
+    "mana": "ST019",
+    "vasudhara": "ST020",
+  };
+  
+  const stationId = STATION_ID_MAP[station] || null;
 
   // AUTH GUARD
   useEffect(() => {
@@ -135,8 +145,13 @@ export default function StationPage() {
     );
   }
 
+  // Get station status
+  const statusInfo = getStationStatus(stationId, "EWS", latestData?.timestamp, 20);
+  const isMaintenance = statusInfo.status === "maintenance";
+  
   // Helper function to format values
   const formatValue = (v, fixed = 2) => {
+    if (isMaintenance) return "NIL";
     if (v === null || v === undefined || v === "") return "--";
     const n = parseFloat(v);
     return isNaN(n) ? "--" : n.toFixed(fixed);
@@ -144,6 +159,9 @@ export default function StationPage() {
 
   // **************** PREMIUM CARD COMPONENT ****************
   const Card = ({ title, value, unit, icon, highlight, fixed = 2, colorScheme = "blue" }) => {
+    const displayValue = formatValue(value, fixed);
+    const showUnit = displayValue !== "NIL" && displayValue !== "--";
+    
     return (
     <div
       className={`
@@ -157,11 +175,13 @@ export default function StationPage() {
     >
         <div className="flex items-center gap-1.5 mb-1">
           <span className="text-xl sm:text-2xl font-bold text-white">
-            {formatValue(value, fixed)}
+            {displayValue}
         </span>
+          {showUnit && (
           <span className="text-xs sm:text-sm font-semibold text-slate-300">
           {unit}
         </span>
+          )}
       </div>
 
         <p className="text-[10px] sm:text-xs font-bold text-center mb-1 text-slate-200">
@@ -215,7 +235,7 @@ export default function StationPage() {
         <div className="absolute bottom-0 w-full h-20 md:h-24 bg-gradient-to-t from-black/70 to-transparent" />
 
         {/* Station name */}
-        <div className="absolute bottom-4 md:bottom-6 w-full flex justify-center px-4">
+        <div className="absolute bottom-4 md:bottom-6 w-full flex flex-col items-center px-4 gap-2">
           <div
             className={`
             px-5 md:px-8 py-3 md:py-4 rounded-xl bg-black/90 border-2 border-yellow-400/50 shadow-2xl 
@@ -230,6 +250,22 @@ export default function StationPage() {
               {currentStation.name.slice(1)}
             </h1>
           </div>
+          {/* Status Badge */}
+          {statusInfo.status === "maintenance" && (
+            <div className="px-4 py-2 bg-yellow-500/90 backdrop-blur-sm text-white rounded-full text-sm font-bold border-2 border-yellow-300 shadow-lg">
+              ⚠ Under Maintenance
+            </div>
+          )}
+          {statusInfo.status === "offline" && (
+            <div className="px-4 py-2 bg-red-500/90 backdrop-blur-sm text-white rounded-full text-sm font-bold border-2 border-red-300 shadow-lg">
+              ● Offline
+            </div>
+          )}
+          {statusInfo.status === "live" && (
+            <div className="px-4 py-2 bg-green-500/90 backdrop-blur-sm text-white rounded-full text-sm font-bold border-2 border-green-300 shadow-lg animate-pulse">
+              ✓ Live
+            </div>
+          )}
         </div>
       </div>
 

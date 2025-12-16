@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import ReactECharts from "echarts-for-react";
 import { Button } from "@/components/ui/button";
+import { useStationStatus } from "../../hooks/useStationStatus";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -76,10 +77,18 @@ export default function TrendsPage() {
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const { getStationStatus } = useStationStatus();
 
   const [filter, setFilter] = useState("today");
   const [customMode, setCustomMode] = useState("single");
   const [customDate, setCustomDate] = useState(undefined);
+  
+  // Station ID mapping
+  const STATION_ID_MAP = {
+    "vasudhara": "ST020",
+    "mana": "ST019",
+    "vishnu_prayag": "ST015",
+  };
 
   // Protect route
   useEffect(() => {
@@ -304,6 +313,14 @@ export default function TrendsPage() {
 
   // Calculate statistics for a field
   const getStats = (key) => {
+    const stationId = STATION_ID_MAP[selectedStation];
+    const statusInfo = stationId ? getStationStatus(stationId, selectedType, data[0]?.timestamp, selectedType === "EWS" ? 20 : 30) : null;
+    const isMaintenance = statusInfo?.status === "maintenance";
+    
+    if (isMaintenance) {
+      return { min: "NIL", max: "NIL", avg: "NIL", current: "NIL" };
+    }
+    
     const validValues = data.map((d) => d[key]).filter((v) => v !== null && v !== undefined && !isNaN(v));
     if (validValues.length === 0) return { min: null, max: null, avg: null, current: null };
     
@@ -317,6 +334,10 @@ export default function TrendsPage() {
 
   // CHART OPTIONS - Stock Market Style
   const getChartOption = (key, label, unit, colorIndex) => {
+    const stationId = STATION_ID_MAP[selectedStation];
+    const statusInfo = stationId ? getStationStatus(stationId, selectedType, data[0]?.timestamp, selectedType === "EWS" ? 20 : 30) : null;
+    const isMaintenance = statusInfo?.status === "maintenance";
+    
     const times = data.map((d) => {
       // Remove the timezone indicator "Z" so browser doesn't convert UTC → local time.
       const clean = d.timestamp ? d.timestamp.replace("Z", "") : null;
@@ -327,7 +348,7 @@ export default function TrendsPage() {
       });
     });
 
-    const values = data.map((d) => d[key]);
+    const values = isMaintenance ? data.map(() => null) : data.map((d) => d[key]);
     const stats = getStats(key);
     const color = pastelColors[colorIndex % pastelColors.length];
 
@@ -601,15 +622,16 @@ export default function TrendsPage() {
               ))}
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  <MapPin className="w-4 h-4 mr-2" />
-                  {(
-                    selectedType === "AWS" ? awsStations : ewsStations
-                  ).find((x) => x.slug === selectedStation)?.name || "Station"}
-                </Button>
-              </DropdownMenuTrigger>
+            <div className="flex items-center gap-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    <MapPin className="w-4 h-4 mr-2" />
+                    {(
+                      selectedType === "AWS" ? awsStations : ewsStations
+                    ).find((x) => x.slug === selectedStation)?.name || "Station"}
+                  </Button>
+                </DropdownMenuTrigger>
 
               <DropdownMenuContent>
                 <DropdownMenuLabel>Stations</DropdownMenuLabel>
@@ -625,6 +647,24 @@ export default function TrendsPage() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+            {/* Status Badge */}
+            {(() => {
+              const stationId = STATION_ID_MAP[selectedStation];
+              if (!stationId) return null;
+              const statusInfo = getStationStatus(stationId, selectedType, data[0]?.timestamp, selectedType === "EWS" ? 20 : 30);
+              return (
+                <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${
+                  statusInfo.status === "maintenance"
+                    ? "bg-yellow-100 text-yellow-700 border border-yellow-300"
+                    : statusInfo.status === "offline"
+                    ? "bg-red-100 text-red-700 border border-red-300"
+                    : "bg-green-100 text-green-700 border border-green-300"
+                }`}>
+                  {statusInfo.status === "maintenance" ? "⚠ Maintenance" : statusInfo.status === "offline" ? "● Offline" : "✓ Live"}
+                </span>
+              );
+            })()}
+            </div>
           </div>
 
           {/* Filters */}

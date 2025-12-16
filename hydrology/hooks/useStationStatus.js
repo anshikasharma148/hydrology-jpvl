@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://hydrology-jpvl.onrender.com";
+// Get backend URL - use localhost if running locally, otherwise use Render
+const getBackendUrl = () => {
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
+  }
+  return process.env.NEXT_PUBLIC_BACKEND_URL || "https://hydrology-jpvl.onrender.com";
+};
 
 /**
  * Custom hook to fetch and manage station statuses
@@ -13,7 +19,8 @@ export function useStationStatus() {
   useEffect(() => {
     const fetchStatuses = async () => {
       try {
-        const response = await fetch(`${BACKEND_URL}/api/station-status`);
+        const backendUrl = getBackendUrl();
+        const response = await fetch(`${backendUrl}/api/station-status`);
         const result = await response.json();
         if (result.success) {
           const statusMap = {};
