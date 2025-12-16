@@ -24,6 +24,7 @@ export default function Navbar() {
   const [trendsSubmenu, setTrendsSubmenu] = useState(null); // 'aws' or 'ews'
   const [trendsStation, setTrendsStation] = useState(null);
   const trendsRef = useRef(null);
+  const trendsTimeoutRef = useRef(null);
   const pathname = usePathname();
   
   // AWS stations and fields
@@ -90,6 +91,25 @@ export default function Navbar() {
     setTrendsStation(null);
   };
   
+  // Close dropdown with delay when mouse leaves
+  const handleMouseLeave = () => {
+    if (trendsTimeoutRef.current) {
+      clearTimeout(trendsTimeoutRef.current);
+    }
+    trendsTimeoutRef.current = setTimeout(() => {
+      setTrendsHover(false);
+      setTrendsSubmenu(null);
+      setTrendsStation(null);
+    }, 300); // 300ms delay before closing
+  };
+  
+  const handleMouseEnter = () => {
+    if (trendsTimeoutRef.current) {
+      clearTimeout(trendsTimeoutRef.current);
+    }
+    setTrendsHover(true);
+  };
+  
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -100,7 +120,12 @@ export default function Navbar() {
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (trendsTimeoutRef.current) {
+        clearTimeout(trendsTimeoutRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -186,16 +211,8 @@ export default function Navbar() {
                 key={item.name}
                 ref={trendsRef}
                 className="relative"
-                onMouseEnter={() => setTrendsHover(true)}
-                onMouseLeave={() => {
-                  setTrendsHover(false);
-                  setTimeout(() => {
-                    if (!trendsHover) {
-                      setTrendsSubmenu(null);
-                      setTrendsStation(null);
-                    }
-                  }, 200);
-                }}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
               >
                 <Link
                   href={item.href}
@@ -212,11 +229,21 @@ export default function Navbar() {
                 
                 {/* Nested Dropdown Menu */}
                 {trendsHover && (
-                  <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[200px] z-50">
+                  <div 
+                    className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[200px] z-50"
+                    onMouseEnter={handleMouseEnter}
+                    onMouseLeave={handleMouseLeave}
+                  >
                     {/* AWS Option */}
                     <div
                       className="relative"
-                      onMouseEnter={() => setTrendsSubmenu('aws')}
+                      onMouseEnter={() => {
+                        if (trendsTimeoutRef.current) clearTimeout(trendsTimeoutRef.current);
+                        setTrendsSubmenu('aws');
+                      }}
+                      onMouseLeave={() => {
+                        // Don't close immediately, allow moving to submenu
+                      }}
                     >
                       <div className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center justify-between">
                         <span className="text-gray-700 font-medium">AWS</span>
@@ -225,12 +252,21 @@ export default function Navbar() {
                       
                       {/* AWS Stations Submenu */}
                       {trendsSubmenu === 'aws' && (
-                        <div className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[180px] z-50">
+                        <div 
+                          className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[180px] z-50"
+                          onMouseEnter={() => {
+                            if (trendsTimeoutRef.current) clearTimeout(trendsTimeoutRef.current);
+                          }}
+                          onMouseLeave={handleMouseLeave}
+                        >
                           {awsStations.map((station) => (
                             <div
                               key={station.slug}
                               className="relative"
-                              onMouseEnter={() => setTrendsStation({ type: 'aws', slug: station.slug })}
+                              onMouseEnter={() => {
+                                if (trendsTimeoutRef.current) clearTimeout(trendsTimeoutRef.current);
+                                setTrendsStation({ type: 'aws', slug: station.slug });
+                              }}
                             >
                               <div className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center justify-between">
                                 <span className="text-gray-700">{station.name}</span>
@@ -239,7 +275,13 @@ export default function Navbar() {
                               
                               {/* AWS Parameters Submenu */}
                               {trendsStation?.type === 'aws' && trendsStation?.slug === station.slug && (
-                                <div className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[220px] max-h-[400px] overflow-y-auto z-50">
+                                <div 
+                                  className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[220px] max-h-[400px] overflow-y-auto z-50"
+                                  onMouseEnter={() => {
+                                    if (trendsTimeoutRef.current) clearTimeout(trendsTimeoutRef.current);
+                                  }}
+                                  onMouseLeave={handleMouseLeave}
+                                >
                                   {awsFields.map((field) => (
                                     <div
                                       key={field.key}
@@ -260,7 +302,10 @@ export default function Navbar() {
                     {/* EWS Option */}
                     <div
                       className="relative"
-                      onMouseEnter={() => setTrendsSubmenu('ews')}
+                      onMouseEnter={() => {
+                        if (trendsTimeoutRef.current) clearTimeout(trendsTimeoutRef.current);
+                        setTrendsSubmenu('ews');
+                      }}
                     >
                       <div className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center justify-between">
                         <span className="text-gray-700 font-medium">EWS</span>
@@ -269,12 +314,21 @@ export default function Navbar() {
                       
                       {/* EWS Stations Submenu */}
                       {trendsSubmenu === 'ews' && (
-                        <div className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[180px] z-50">
+                        <div 
+                          className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[180px] z-50"
+                          onMouseEnter={() => {
+                            if (trendsTimeoutRef.current) clearTimeout(trendsTimeoutRef.current);
+                          }}
+                          onMouseLeave={handleMouseLeave}
+                        >
                           {ewsStations.map((station) => (
                             <div
                               key={station.slug}
                               className="relative"
-                              onMouseEnter={() => setTrendsStation({ type: 'ews', slug: station.slug })}
+                              onMouseEnter={() => {
+                                if (trendsTimeoutRef.current) clearTimeout(trendsTimeoutRef.current);
+                                setTrendsStation({ type: 'ews', slug: station.slug });
+                              }}
                             >
                               <div className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center justify-between">
                                 <span className="text-gray-700">{station.name}</span>
@@ -283,7 +337,13 @@ export default function Navbar() {
                               
                               {/* EWS Parameters Submenu */}
                               {trendsStation?.type === 'ews' && trendsStation?.slug === station.slug && (
-                                <div className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[220px] max-h-[400px] overflow-y-auto z-50">
+                                <div 
+                                  className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[220px] max-h-[400px] overflow-y-auto z-50"
+                                  onMouseEnter={() => {
+                                    if (trendsTimeoutRef.current) clearTimeout(trendsTimeoutRef.current);
+                                  }}
+                                  onMouseLeave={handleMouseLeave}
+                                >
                                   {getEwsFields(station.slug).map((field) => (
                                     <div
                                       key={field.key}

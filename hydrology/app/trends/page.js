@@ -74,8 +74,43 @@ export default function TrendsPage() {
   const router = useRouter();
   
   // Read URL parameters
-  const [urlParams, setUrlParams] = useState({ type: null, station: null, parameter: null });
+  // Initialize from URL parameters
+  const getInitialState = () => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return {
+        type: params.get('type') || "AWS",
+        station: params.get('station') || awsStations[0].slug,
+        parameter: params.get('parameter') || null,
+      };
+    }
+    return { type: "AWS", station: awsStations[0].slug, parameter: null };
+  };
   
+  const [selectedType, setSelectedType] = useState(() => getInitialState().type);
+  const [selectedStation, setSelectedStation] = useState(() => getInitialState().station);
+  const [selectedParameter, setSelectedParameter] = useState(() => getInitialState().parameter);
+  
+  // Update state when URL changes
+  useEffect(() => {
+    const handlePopState = () => {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const type = params.get('type');
+        const station = params.get('station');
+        const parameter = params.get('parameter');
+        
+        if (type) setSelectedType(type);
+        if (station) setSelectedStation(station);
+        setSelectedParameter(parameter);
+      }
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+  
+  // Also check URL on mount and when router changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -85,13 +120,9 @@ export default function TrendsPage() {
       
       if (type) setSelectedType(type);
       if (station) setSelectedStation(station);
-      if (parameter) setSelectedParameter(parameter);
+      if (parameter !== null) setSelectedParameter(parameter);
     }
-  }, []);
-  
-  const [selectedType, setSelectedType] = useState("AWS");
-  const [selectedStation, setSelectedStation] = useState(awsStations[0].slug);
-  const [selectedParameter, setSelectedParameter] = useState(null);
+  }, [router]);
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
