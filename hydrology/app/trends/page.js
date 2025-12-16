@@ -534,7 +534,7 @@ export default function TrendsPage() {
               shadowColor: color
             }
           },
-          markLine: stats.min !== null && stats.max !== null ? {
+          markLine: stats.min !== null && stats.max !== null && typeof stats.avg === 'number' ? {
             silent: true,
             symbol: "none",
             label: {
