@@ -64,7 +64,7 @@ const getIPLocation = async (ipAddress) => {
       const timeout = setTimeout(() => {
         console.warn(`[IP Location] Request timeout for IP: ${ipAddress}`);
         reject(new Error('Timeout'));
-      }, 3000);
+      }, 4000);
       // Using ip-api.com free service (HTTP only for free tier, no API key required)
       const url = `http://ip-api.com/json/${ipAddress}?fields=status,message,country,regionName,city,isp,org`;
       console.log(`[IP Location] Requesting: ${url}`);
@@ -113,18 +113,19 @@ const logLoginAttempt = async (userId, email, name, role, ipAddress, loginType, 
   try {
     console.log(`[LOGIN LOG] Attempting to log: ${email}, ${name}, ${role}, ${ipAddress}, ${loginType}, ${status}`);
     
-    // Get location and ISP info (non-blocking - don't wait if it takes too long)
+    // Get location and ISP info (with reasonable timeout)
     let location = null;
     let ispName = null;
     try {
       console.log(`[LOGIN LOG] Fetching location for IP: ${ipAddress}`);
+      // Increase timeout to 5 seconds to allow API to respond
       const locationInfo = await Promise.race([
         getIPLocation(ipAddress),
         new Promise((resolve) => {
           setTimeout(() => {
-            console.warn('[LOGIN LOG] Location fetch timed out after 2 seconds');
+            console.warn('[LOGIN LOG] Location fetch timed out after 5 seconds');
             resolve({ location: null, ispName: null });
-          }, 2000);
+          }, 5000);
         })
       ]);
       location = locationInfo.location;
