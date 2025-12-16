@@ -160,20 +160,26 @@ router.post("/login", async (req, res) => {
 
     const dbUser = user[0];
     
-    // Security: Reject if user is trying to log in as admin through regular login route
-    // Admins must use /admin-login route
+    // Security: If user selects "admin" role, verify they are actually an admin
     if (role && role.toLowerCase() === 'admin') {
-      const fullName = `${dbUser.first_name || ''} ${dbUser.last_name || ''}`.trim() || 'Unknown';
-      await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, 'user', 'failed');
-      return res.status(403).json({ error: "Admins must use the admin login page" });
-    }
-    
-    // Security: Reject if user is actually an admin trying to use regular login
-    // Admins should use /admin-login route
-    if (dbUser.role && dbUser.role.toLowerCase() === 'admin') {
-      const fullName = `${dbUser.first_name || ''} ${dbUser.last_name || ''}`.trim() || 'Unknown';
-      await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, 'user', 'failed');
-      return res.status(403).json({ error: "Admins must use the admin login page" });
+      // Check if user is actually an admin
+      if (!dbUser.role || dbUser.role.toLowerCase() !== 'admin') {
+        // Non-admin trying to log in as admin - reject
+        const fullName = `${dbUser.first_name || ''} ${dbUser.last_name || ''}`.trim() || 'Unknown';
+        await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, 'user', 'failed');
+        return res.status(403).json({ error: "Access denied. You are not an admin." });
+      }
+      // User is admin and selected admin role - allow, but log as admin login
+      // Continue to password check below
+    } else {
+      // User selected non-admin role - verify they are not an admin
+      if (dbUser.role && dbUser.role.toLowerCase() === 'admin') {
+        // Admin trying to use regular login without selecting admin role - reject
+        const fullName = `${dbUser.first_name || ''} ${dbUser.last_name || ''}`.trim() || 'Unknown';
+        await logLoginAttempt(dbUser.id, email, fullName, dbUser.role, ipAddress, 'user', 'failed');
+        return res.status(403).json({ error: "Admins must select 'Admin' role to login" });
+      }
+      // Regular user with regular role - allow
     }
     
     let validPass = false;
