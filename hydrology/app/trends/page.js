@@ -77,6 +77,7 @@ export default function TrendsPage() {
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [latestTimestamp, setLatestTimestamp] = useState(null); // Store latest timestamp for status check
   const { getStationStatus } = useStationStatus();
 
   const [filter, setFilter] = useState("today");
@@ -150,6 +151,18 @@ export default function TrendsPage() {
         const isVasudhara = key === "Vasudhara";
 
         const arr = raw?.data?.[key] || [];
+        
+        // Get the latest timestamp from raw data (before filtering)
+        if (arr.length > 0) {
+          const latest = arr.reduce((latest, current) => {
+            const latestTime = new Date(latest.timestamp || 0).getTime();
+            const currentTime = new Date(current.timestamp || 0).getTime();
+            return currentTime > latestTime ? current : latest;
+          }, arr[0]);
+          setLatestTimestamp(latest.timestamp);
+        } else {
+          setLatestTimestamp(null);
+        }
 
         formattedData = arr.map((item) => {
           const baseData = {
@@ -314,7 +327,8 @@ export default function TrendsPage() {
   // Calculate statistics for a field
   const getStats = (key) => {
     const stationId = STATION_ID_MAP[selectedStation];
-    const statusInfo = stationId ? getStationStatus(stationId, selectedType, data[0]?.timestamp, selectedType === "EWS" ? 20 : 30) : null;
+    // Use latestTimestamp from raw API data, not filtered chart data
+    const statusInfo = stationId ? getStationStatus(stationId, selectedType, latestTimestamp, selectedType === "EWS" ? 20 : 30) : null;
     const isMaintenance = statusInfo?.status === "maintenance";
     
     if (isMaintenance) {
@@ -335,7 +349,8 @@ export default function TrendsPage() {
   // CHART OPTIONS - Stock Market Style
   const getChartOption = (key, label, unit, colorIndex) => {
     const stationId = STATION_ID_MAP[selectedStation];
-    const statusInfo = stationId ? getStationStatus(stationId, selectedType, data[0]?.timestamp, selectedType === "EWS" ? 20 : 30) : null;
+    // Use latestTimestamp from raw API data, not filtered chart data
+    const statusInfo = stationId ? getStationStatus(stationId, selectedType, latestTimestamp, selectedType === "EWS" ? 20 : 30) : null;
     const isMaintenance = statusInfo?.status === "maintenance";
     
     const times = data.map((d) => {
@@ -654,7 +669,8 @@ export default function TrendsPage() {
             {(() => {
               const stationId = STATION_ID_MAP[selectedStation];
               if (!stationId) return null;
-              const statusInfo = getStationStatus(stationId, selectedType, data[0]?.timestamp, selectedType === "EWS" ? 20 : 30);
+              // Use latestTimestamp from raw API data, not filtered chart data
+              const statusInfo = getStationStatus(stationId, selectedType, latestTimestamp, selectedType === "EWS" ? 20 : 30);
               return (
                 <span className={`px-3 py-1.5 rounded-full text-xs font-bold ${
                   statusInfo.status === "maintenance"
