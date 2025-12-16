@@ -6,13 +6,48 @@ const { usersDB, hydrologyDB } = require("../db");
 const router = express.Router();
 
 // Helper function to get client IP address
-const getClientIP = (req) => {
-  return req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-         req.headers['x-real-ip'] ||
-         req.connection?.remoteAddress ||
-         req.socket?.remoteAddress ||
-         req.ip ||
-         'Unknown';
+const getClientIP = async (req) => {
+  // First, try to get IP from headers (works when behind proxy/load balancer)
+  let ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+           req.headers['x-real-ip'] ||
+           req.connection?.remoteAddress ||
+           req.socket?.remoteAddress ||
+           req.ip ||
+           null;
+
+  // If IP is localhost/127.0.0.1, try to get public IP from external service
+  if (!ip || ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.')) {
+    try {
+      // Try to get public IP from external service
+      const https = require('https');
+      const publicIP = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timeout')), 2000);
+        https.get('https://api.ipify.org?format=json', (res) => {
+          let data = '';
+          res.on('data', (chunk) => { data += chunk; });
+          res.on('end', () => {
+            clearTimeout(timeout);
+            try {
+              const json = JSON.parse(data);
+              resolve(json.ip);
+            } catch (e) {
+              reject(e);
+            }
+          });
+        }).on('error', (err) => {
+          clearTimeout(timeout);
+          reject(err);
+        });
+      });
+      return publicIP || ip || 'Unknown';
+    } catch (error) {
+      // If external service fails, return the original IP or 'Unknown'
+      console.warn('[IP Detection] Failed to get public IP:', error.message);
+      return ip || 'Unknown';
+    }
+  }
+
+  return ip;
 };
 
 // Helper function to log login attempt
@@ -112,7 +147,7 @@ router.post("/login", async (req, res) => {
   try {
     console.log("[LOGIN] Login attempt received");
     const { email, password } = req.body;
-    const ipAddress = getClientIP(req);
+    const ipAddress = await getClientIP(req);
     console.log(`[LOGIN] Email: ${email}, IP: ${ipAddress}`);
 
     const [user] = await usersDB.query("SELECT * FROM users WHERE email = ?", [email]);
