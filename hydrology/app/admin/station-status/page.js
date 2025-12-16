@@ -27,6 +27,9 @@ export default function StationStatusManagement() {
   const [saving, setSaving] = useState({});
   const [adminName, setAdminName] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [showDialog, setShowDialog] = useState(false);
+  const [dialogData, setDialogData] = useState(null);
+  const [statusInput, setStatusInput] = useState("");
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -66,7 +69,45 @@ export default function StationStatusManagement() {
     setTimeout(() => setSuccessMessage(""), 3000);
   };
 
-  const handleStatusChange = async (stationId, serviceType, newStatus) => {
+  const handleStatusChangeClick = (stationId, serviceType, newStatus, stationName) => {
+    // Show confirmation dialog
+    setDialogData({
+      stationId,
+      serviceType,
+      newStatus,
+      stationName,
+    });
+    setStatusInput("");
+    setShowDialog(true);
+  };
+
+  const handleStatusChange = async () => {
+    if (!dialogData) return;
+
+    const { stationId, serviceType, newStatus, stationName } = dialogData;
+    
+    // Get expected status text based on newStatus value
+    const expectedStatusText = newStatus === "live" ? "Live" : 
+                               newStatus === "offline" ? "Offline" : 
+                               "Maintenance";
+    
+    // Validate input
+    if (statusInput.trim() !== expectedStatusText) {
+      alert(`Please type "${expectedStatusText}" exactly to confirm the status change.`);
+      return;
+    }
+
+    // Show confirmation alert
+    const confirmMessage = `Do you want to change the status of ${stationName} (${serviceType}) to ${expectedStatusText}?`;
+    if (!window.confirm(confirmMessage)) {
+      setShowDialog(false);
+      setDialogData(null);
+      setStatusInput("");
+      return;
+    }
+
+    // Close dialog
+    setShowDialog(false);
     const key = `${stationId}_${serviceType}`;
     setSaving({ ...saving, [key]: true });
 
@@ -85,7 +126,7 @@ export default function StationStatusManagement() {
       const result = await response.json();
       if (result.success) {
         await fetchStatuses();
-        showSuccess(`Status updated to ${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}`);
+        showSuccess(`Status updated to ${expectedStatusText}`);
       } else {
         alert(`Error: ${result.error || "Failed to update status"}`);
       }
@@ -94,6 +135,8 @@ export default function StationStatusManagement() {
       alert("Failed to update status. Please try again.");
     } finally {
       setSaving({ ...saving, [key]: false });
+      setDialogData(null);
+      setStatusInput("");
     }
   };
 
@@ -217,6 +260,93 @@ export default function StationStatusManagement() {
             </svg>
             <span className="font-medium">{successMessage}</span>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirmation Dialog */}
+      <AnimatePresence>
+        {showDialog && dialogData && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-200"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-800">Confirm Status Change</h3>
+                <button
+                  onClick={() => {
+                    setShowDialog(false);
+                    setDialogData(null);
+                    setStatusInput("");
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-gray-700 mb-2">
+                  You are about to change the status of:
+                </p>
+                <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                  <p className="font-semibold text-gray-800">{dialogData.stationName}</p>
+                  <p className="text-sm text-gray-600">{dialogData.serviceType} • {dialogData.stationId}</p>
+                </div>
+                <p className="text-gray-700 mb-2">
+                  New Status: <span className="font-bold text-indigo-600">
+                    {dialogData.newStatus === "live" ? "Live" : 
+                     dialogData.newStatus === "offline" ? "Offline" : 
+                     "Under Maintenance"}
+                  </span>
+                </p>
+                <p className="text-sm text-gray-600 mb-4">
+                  For security purposes, please type <strong>"{dialogData.newStatus === "live" ? "Live" : dialogData.newStatus === "offline" ? "Offline" : "Maintenance"}"</strong> to confirm:
+                </p>
+                <input
+                  type="text"
+                  value={statusInput}
+                  onChange={(e) => setStatusInput(e.target.value)}
+                  placeholder={`Type "${dialogData.newStatus === "live" ? "Live" : dialogData.newStatus === "offline" ? "Offline" : "Maintenance"}" here`}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800 font-medium"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleStatusChange();
+                    } else if (e.key === "Escape") {
+                      setShowDialog(false);
+                      setDialogData(null);
+                      setStatusInput("");
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowDialog(false);
+                    setDialogData(null);
+                    setStatusInput("");
+                  }}
+                  className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleStatusChange}
+                  disabled={statusInput.trim() !== (dialogData.newStatus === "live" ? "Live" : dialogData.newStatus === "offline" ? "Offline" : "Maintenance")}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Confirm Change
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
@@ -368,7 +498,7 @@ export default function StationStatusManagement() {
               {/* Action Buttons */}
               <div className="space-y-2.5">
                 <button
-                  onClick={() => handleStatusChange(station.id, station.serviceType, "live")}
+                  onClick={() => handleStatusChangeClick(station.id, station.serviceType, "live", station.name)}
                   disabled={isSaving || currentStatus === "live"}
                   className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-[1.02] ${
                     currentStatus === "live"
@@ -392,7 +522,7 @@ export default function StationStatusManagement() {
                 </button>
 
                 <button
-                  onClick={() => handleStatusChange(station.id, station.serviceType, "offline")}
+                  onClick={() => handleStatusChangeClick(station.id, station.serviceType, "offline", station.name)}
                   disabled={isSaving || currentStatus === "offline"}
                   className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-[1.02] ${
                     currentStatus === "offline"
@@ -416,7 +546,7 @@ export default function StationStatusManagement() {
                 </button>
 
                 <button
-                  onClick={() => handleStatusChange(station.id, station.serviceType, "maintenance")}
+                  onClick={() => handleStatusChangeClick(station.id, station.serviceType, "maintenance", station.name)}
                   disabled={isSaving || currentStatus === "maintenance"}
                   className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-[1.02] ${
                     currentStatus === "maintenance"
