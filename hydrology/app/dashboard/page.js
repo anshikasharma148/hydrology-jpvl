@@ -193,8 +193,7 @@ export default function Dashboard() {
         };
       }
 
-      // Mana (new) - TEMPORARILY SHOW AS OFFLINE
-      // TODO: Remove timestamp override when Mana starts receiving data
+      // Mana (new)
       if (json?.data?.Mana && Array.isArray(json.data.Mana) && json.data.Mana.length) {
         const arrM = json.data.Mana;
         
@@ -220,7 +219,6 @@ export default function Dashboard() {
         };
 
         // Use candidateM timestamp (same record as data), fallback to latestRecordM if missing
-        // TEMPORARILY: Set timestamp to null to show as Offline
         manaNorm = {
           StationID: candidateM.StationID ?? null,
           DeviceID: candidateM.DeviceID ?? null,
@@ -232,7 +230,7 @@ export default function Dashboard() {
           tilt_angle: safeParse(candidateM.tilt_angle),
           flow_direction: safeParse(candidateM.flow_direction),
           SNR: safeParse(candidateM.SNR),
-          timestamp: null, // TEMPORARILY set to null to show as Offline - TODO: Change to: fixManaTimestamp(candidateM.timestamp) ?? fixManaTimestamp(latestRecordM.timestamp)
+          timestamp: fixManaTimestamp(candidateM.timestamp) ?? fixManaTimestamp(latestRecordM.timestamp),
           UID: candidateM.UID ?? null,
           raw: candidateM,
         };
