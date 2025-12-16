@@ -416,8 +416,11 @@ export default function TrendsPage() {
             </div>`;
           });
           if (stats.min !== null && stats.max !== null) {
+            const minStr = typeof stats.min === 'number' ? stats.min.toFixed(2) : stats.min;
+            const maxStr = typeof stats.max === 'number' ? stats.max.toFixed(2) : stats.max;
+            const avgStr = typeof stats.avg === 'number' ? stats.avg.toFixed(2) : stats.avg;
             result += `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #444; font-size: 11px; color: #aaa;">
-              Min: ${stats.min.toFixed(2)} | Max: ${stats.max.toFixed(2)} | Avg: ${stats.avg.toFixed(2)}
+              Min: ${minStr} | Max: ${maxStr} | Avg: ${avgStr}
             </div>`;
           }
           return result;
@@ -776,15 +779,21 @@ export default function TrendsPage() {
                     <div className="grid grid-cols-3 gap-3 mb-4 pb-4 border-b border-gray-100">
                       <div className="text-center">
                         <p className="text-xs text-gray-500 font-medium mb-1">Min</p>
-                        <p className="text-sm font-bold text-gray-700">{stats.min.toFixed(2)}</p>
+                        <p className="text-sm font-bold text-gray-700">
+                          {typeof stats.min === 'number' ? stats.min.toFixed(2) : stats.min}
+                        </p>
                       </div>
                       <div className="text-center">
                         <p className="text-xs text-gray-500 font-medium mb-1">Avg</p>
-                        <p className="text-sm font-bold text-gray-700">{stats.avg.toFixed(2)}</p>
+                        <p className="text-sm font-bold text-gray-700">
+                          {typeof stats.avg === 'number' ? stats.avg.toFixed(2) : stats.avg}
+                        </p>
                       </div>
                       <div className="text-center">
                         <p className="text-xs text-gray-500 font-medium mb-1">Max</p>
-                        <p className="text-sm font-bold text-gray-700">{stats.max.toFixed(2)}</p>
+                        <p className="text-sm font-bold text-gray-700">
+                          {typeof stats.max === 'number' ? stats.max.toFixed(2) : stats.max}
+                        </p>
                       </div>
                 </div>
                   )}
