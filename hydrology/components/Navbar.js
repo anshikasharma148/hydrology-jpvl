@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useStations } from "../hooks/useStations";
 
 export default function Navbar() {
   const router = useRouter();
@@ -26,62 +27,131 @@ export default function Navbar() {
   const trendsRef = useRef(null);
   const trendsTimeoutRef = useRef(null);
   const pathname = usePathname();
+  const { awsStations: awsStationsData, ewsStations: ewsStationsData } = useStations();
   
-  // AWS stations and fields
-  const awsStations = [
-    { name: "Vasudhara", slug: "vasudhara" },
-    { name: "Mana", slug: "mana" },
-    { name: "Barrage", slug: "vishnu_prayag" },
-  ];
+  // Convert station data to format needed by navbar
+  const awsStations = awsStationsData.map(station => ({
+    name: station.station_name,
+    slug: station.station_name.toLowerCase().replace(/\s+/g, '_').replace(/[()]/g, ''),
+    stationId: station.StationID,
+    selectedFields: station.selected_fields || [],
+    customFields: station.custom_fields || []
+  }));
   
-  const awsFields = [
-    { key: "temperature", label: "Temperature" },
-    { key: "pressure", label: "Pressure" },
-    { key: "relative_humidity", label: "Humidity" },
-    { key: "windspeed", label: "Wind Speed" },
-    { key: "winddirection", label: "Wind Dir" },
-    { key: "rain", label: "Rain" },
-    { key: "precipitation", label: "Precipitation" },
-    { key: "bucket_weight", label: "Bucket Weight" },
-    { key: "PIR", label: "PIR" },
-    { key: "avg_PIR", label: "Avg PIR" },
-  ];
+  const ewsStations = ewsStationsData.map(station => ({
+    name: station.station_name,
+    slug: station.station_name.toLowerCase().replace(/\s+/g, '_').replace(/[()]/g, ''),
+    stationId: station.StationID,
+    selectedFields: station.selected_fields || [],
+    customFields: station.custom_fields || []
+  }));
   
-  // EWS stations and fields
-  const ewsStations = [
-    { name: "Vasudhara", slug: "vasudhara" },
-    { name: "Mana", slug: "mana" },
-  ];
+  // Comprehensive field label mapping for all possible fields
+  const fieldLabelMap = {
+    // AWS fields
+    "temperature": "Temperature",
+    "pressure": "Pressure",
+    "relative_humidity": "Humidity",
+    "windspeed": "Wind Speed",
+    "winddirection": "Wind Direction",
+    "rain": "Rain",
+    "precipitation": "Precipitation",
+    "bucket_weight": "Bucket Weight",
+    "PIR": "PIR (Solar Radiation)",
+    "avg_PIR": "Average PIR",
+    
+    // EWS fields
+    "water_level": "Water Level",
+    "water_discharge": "Water Discharge",
+    "surface_velocity": "Surface Velocity",
+    "avg_surface_velocity": "Average Surface Velocity",
+    "water_dist_sensor": "Water Distance Sensor",
+    "tilt_angle": "Tilt Angle",
+    "flow_direction": "Flow Direction",
+    "SNR": "SNR",
+    "internal_temperature": "Internal Temperature",
+    "charge_current": "Charge Current",
+    "observed_current": "Observed Current",
+    "absorbed_current": "Absorbed Current", // Alias for observed_current
+    "battery_voltage": "Battery Voltage",
+    "solar_panel_tracking": "Solar Panel Tracking",
+  };
   
-  const ewsBaseFields = [
-    { key: "water_level", label: "Water Level" },
-    { key: "water_discharge", label: "Water Discharge" },
-    { key: "surface_velocity", label: "Surface Velocity" },
-    { key: "avg_surface_velocity", label: "Avg Surface Velocity" },
-    { key: "water_dist_sensor", label: "Distance from Sensor" },
-    { key: "tilt_angle", label: "Tilt Angle" },
-    { key: "flow_direction", label: "Flow Direction" },
-  ];
-  
-  const ewsVasudharaFields = [
-    { key: "internal_temperature", label: "Internal Temperature" },
-    { key: "charge_current", label: "Charge Current" },
-    { key: "absorbed_current", label: "Absorbed Current" },
-    { key: "battery_voltage", label: "Battery Voltage" },
-    { key: "solar_panel_tracking", label: "Solar Panel Tracking" },
-  ];
-  
-  const ewsManaFields = [
-    { key: "SNR", label: "SNR" },
-  ];
+  // Function to get label for a field key, with fallback for custom fields
+  const getFieldLabel = (fieldKey) => {
+    return fieldLabelMap[fieldKey] || fieldKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
   
   const getEwsFields = (stationSlug) => {
-    if (stationSlug === "vasudhara") {
-      return [...ewsBaseFields, ...ewsVasudharaFields];
-    } else if (stationSlug === "mana") {
-      return [...ewsBaseFields, ...ewsManaFields];
+    // Find station and get its selected fields
+    const station = ewsStations.find(s => s.slug === stationSlug);
+    if (!station) {
+      return [];
     }
-    return ewsBaseFields;
+    
+    // Get all selected fields and convert to field objects with labels
+    const fields = [];
+    
+    // Add standard selected fields
+    if (station.selectedFields && station.selectedFields.length > 0) {
+      station.selectedFields.forEach(fieldKey => {
+        fields.push({
+          key: fieldKey,
+          label: getFieldLabel(fieldKey)
+        });
+      });
+    }
+    
+    // Add custom fields if available
+    if (station.customFields && Array.isArray(station.customFields) && station.customFields.length > 0) {
+      station.customFields.forEach(customField => {
+        if (customField.name) {
+          fields.push({
+            key: customField.name,
+            label: customField.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+          });
+        }
+      });
+    }
+    
+    // Sort fields alphabetically by label for better UX
+    return fields.sort((a, b) => a.label.localeCompare(b.label));
+  };
+  
+  const getAwsFields = (stationSlug) => {
+    // Find station and get its selected fields
+    const station = awsStations.find(s => s.slug === stationSlug);
+    if (!station) {
+      return [];
+    }
+    
+    // Get all selected fields and convert to field objects with labels
+    const fields = [];
+    
+    // Add standard selected fields
+    if (station.selectedFields && station.selectedFields.length > 0) {
+      station.selectedFields.forEach(fieldKey => {
+        fields.push({
+          key: fieldKey,
+          label: getFieldLabel(fieldKey)
+        });
+      });
+    }
+    
+    // Add custom fields if available
+    if (station.customFields && Array.isArray(station.customFields) && station.customFields.length > 0) {
+      station.customFields.forEach(customField => {
+        if (customField.name) {
+          fields.push({
+            key: customField.name,
+            label: customField.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+          });
+        }
+      });
+    }
+    
+    // Sort fields alphabetically by label for better UX
+    return fields.sort((a, b) => a.label.localeCompare(b.label));
   };
   
   const handleTrendsParameterSelect = (type, stationSlug, fieldKey) => {
@@ -230,7 +300,7 @@ export default function Navbar() {
                 {/* Nested Dropdown Menu */}
                 {trendsHover && (
                   <div 
-                    className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[200px] z-50"
+                    className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-2xl border border-gray-300 py-1 min-w-[200px] z-[100]"
                     onMouseEnter={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
                   >
@@ -245,15 +315,15 @@ export default function Navbar() {
                         // Don't close immediately, allow moving to submenu
                       }}
                     >
-                      <div className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center justify-between">
-                        <span className="text-gray-700 font-medium">AWS</span>
-                        <ChevronRight size={16} className="text-gray-400" />
+                      <div className="px-4 py-2.5 hover:bg-blue-50 cursor-pointer flex items-center justify-between transition-colors">
+                        <span className="text-gray-800 font-semibold">AWS</span>
+                        <ChevronRight size={16} className="text-gray-500" />
                       </div>
                       
                       {/* AWS Stations Submenu */}
                       {trendsSubmenu === 'aws' && (
                         <div 
-                          className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[180px] z-50"
+                          className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-2xl border border-gray-300 py-1 min-w-[180px] z-[100]"
                           onMouseEnter={() => {
                             if (trendsTimeoutRef.current) clearTimeout(trendsTimeoutRef.current);
                           }}
@@ -268,29 +338,35 @@ export default function Navbar() {
                                 setTrendsStation({ type: 'aws', slug: station.slug });
                               }}
                             >
-                              <div className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center justify-between">
-                                <span className="text-gray-700">{station.name}</span>
-                                <ChevronRight size={16} className="text-gray-400" />
+                              <div className="px-4 py-2.5 hover:bg-blue-50 cursor-pointer flex items-center justify-between transition-colors">
+                                <span className="text-gray-800 font-medium">{station.name}</span>
+                                <ChevronRight size={16} className="text-gray-500" />
                               </div>
                               
                               {/* AWS Parameters Submenu */}
                               {trendsStation?.type === 'aws' && trendsStation?.slug === station.slug && (
                                 <div 
-                                  className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[220px] max-h-[400px] overflow-y-auto z-50"
+                                  className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-2xl border border-gray-300 py-1 min-w-[240px] max-h-[400px] overflow-y-auto z-[100]"
                                   onMouseEnter={() => {
                                     if (trendsTimeoutRef.current) clearTimeout(trendsTimeoutRef.current);
                                   }}
                                   onMouseLeave={handleMouseLeave}
                                 >
-                                  {awsFields.map((field) => (
-                                    <div
-                                      key={field.key}
-                                      onClick={() => handleTrendsParameterSelect('AWS', station.slug, field.key)}
-                                      className="px-4 py-2 hover:bg-blue-50 hover:text-blue-700 cursor-pointer"
-                                    >
-                                      {field.label}
+                                  {getAwsFields(station.slug).length > 0 ? (
+                                    getAwsFields(station.slug).map((field) => (
+                                      <div
+                                        key={field.key}
+                                        onClick={() => handleTrendsParameterSelect('AWS', station.slug, field.key)}
+                                        className="px-4 py-2.5 hover:bg-blue-100 hover:text-blue-800 cursor-pointer text-sm text-gray-800 transition-colors font-medium"
+                                      >
+                                        {field.label}
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="px-4 py-2.5 text-gray-500 text-sm italic">
+                                      No parameters available
                                     </div>
-                                  ))}
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -307,15 +383,15 @@ export default function Navbar() {
                         setTrendsSubmenu('ews');
                       }}
                     >
-                      <div className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center justify-between">
-                        <span className="text-gray-700 font-medium">EWS</span>
-                        <ChevronRight size={16} className="text-gray-400" />
+                      <div className="px-4 py-2.5 hover:bg-blue-50 cursor-pointer flex items-center justify-between transition-colors">
+                        <span className="text-gray-800 font-semibold">EWS</span>
+                        <ChevronRight size={16} className="text-gray-500" />
                       </div>
                       
                       {/* EWS Stations Submenu */}
                       {trendsSubmenu === 'ews' && (
                         <div 
-                          className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[180px] z-50"
+                          className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-2xl border border-gray-300 py-1 min-w-[180px] z-[100]"
                           onMouseEnter={() => {
                             if (trendsTimeoutRef.current) clearTimeout(trendsTimeoutRef.current);
                           }}
@@ -330,29 +406,35 @@ export default function Navbar() {
                                 setTrendsStation({ type: 'ews', slug: station.slug });
                               }}
                             >
-                              <div className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center justify-between">
-                                <span className="text-gray-700">{station.name}</span>
-                                <ChevronRight size={16} className="text-gray-400" />
+                              <div className="px-4 py-2.5 hover:bg-blue-50 cursor-pointer flex items-center justify-between transition-colors">
+                                <span className="text-gray-800 font-medium">{station.name}</span>
+                                <ChevronRight size={16} className="text-gray-500" />
                               </div>
                               
                               {/* EWS Parameters Submenu */}
                               {trendsStation?.type === 'ews' && trendsStation?.slug === station.slug && (
                                 <div 
-                                  className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[220px] max-h-[400px] overflow-y-auto z-50"
+                                  className="absolute left-full top-0 ml-1 bg-white rounded-lg shadow-2xl border border-gray-300 py-1 min-w-[240px] max-h-[400px] overflow-y-auto z-[100]"
                                   onMouseEnter={() => {
                                     if (trendsTimeoutRef.current) clearTimeout(trendsTimeoutRef.current);
                                   }}
                                   onMouseLeave={handleMouseLeave}
                                 >
-                                  {getEwsFields(station.slug).map((field) => (
-                                    <div
-                                      key={field.key}
-                                      onClick={() => handleTrendsParameterSelect('EWS', station.slug, field.key)}
-                                      className="px-4 py-2 hover:bg-blue-50 hover:text-blue-700 cursor-pointer"
-                                    >
-                                      {field.label}
+                                  {getEwsFields(station.slug).length > 0 ? (
+                                    getEwsFields(station.slug).map((field) => (
+                                      <div
+                                        key={field.key}
+                                        onClick={() => handleTrendsParameterSelect('EWS', station.slug, field.key)}
+                                        className="px-4 py-2.5 hover:bg-blue-100 hover:text-blue-800 cursor-pointer text-sm text-gray-800 transition-colors font-medium"
+                                      >
+                                        {field.label}
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="px-4 py-2.5 text-gray-500 text-sm italic">
+                                      No parameters available
                                     </div>
-                                  ))}
+                                  )}
                                 </div>
                               )}
                             </div>

@@ -9,6 +9,7 @@ import Navbar from '../../../components/Navbar';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { useStationStatus } from '../../../hooks/useStationStatus';
+import { useStations } from '../../../hooks/useStations';
 import {
   WiHumidity,
   WiBarometer,
@@ -144,12 +145,25 @@ export default function StationPage() {
   const { station } = useParams();
   const router = useRouter();
   const stationKey = station.toLowerCase();
-  const stationDisplay =
-  stationKey === 'mana'
-    ? 'Mana'
-    : stationKey === 'lambagad'
-    ? 'Barrage'
-    : 'Vasudhara';
+  const { awsStations, loading: stationsLoading } = useStations();
+  
+  // Find station from dynamic list
+  const stationInfo = React.useMemo(() => {
+    if (!awsStations || awsStations.length === 0) return null;
+    return awsStations.find(s => {
+      const slug = s.station_name.toLowerCase().replace(/\s+/g, '_').replace(/[()]/g, '');
+      return slug === stationKey || 
+             (s.station_name === "Barrage" && (stationKey === "lambagad" || stationKey === "barrage")) ||
+             (s.station_name === "Lambagad" && (stationKey === "lambagad" || stationKey === "barrage"));
+    });
+  }, [awsStations, stationKey]);
+  
+  const stationDisplay = stationInfo ? stationInfo.station_name : (
+    stationKey === 'mana' ? 'Mana' :
+    stationKey === 'lambagad' ? 'Barrage' :
+    stationKey === 'barrage' ? 'Barrage' :
+    'Vasudhara'
+  );
 
   const stateName = stationStates[stationKey] || 'Uttarakhand';
 
@@ -161,15 +175,24 @@ export default function StationPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const { getStationStatus } = useStationStatus();
   
-  // Station ID mapping
-  const STATION_ID_MAP = {
-    "mana": "ST019",
-    "lambagad": "ST015",
-    "barrage": "ST015",
-    "vasudhara": "ST020",
-  };
+  // Build Station ID mapping dynamically
+  const STATION_ID_MAP = React.useMemo(() => {
+    const map = {};
+    if (awsStations) {
+      awsStations.forEach(s => {
+        const slug = s.station_name.toLowerCase().replace(/\s+/g, '_').replace(/[()]/g, '');
+        map[slug] = s.StationID;
+        // Handle aliases
+        if (s.station_name === "Barrage" || s.station_name === "Lambagad") {
+          map["lambagad"] = s.StationID;
+          map["barrage"] = s.StationID;
+        }
+      });
+    }
+    return map;
+  }, [awsStations]);
   
-  const stationId = STATION_ID_MAP[stationKey] || null;
+  const stationId = STATION_ID_MAP[stationKey] || stationInfo?.StationID || null;
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -184,17 +207,30 @@ export default function StationPage() {
   }, []);
 
   useEffect(() => {
+    // Wait for stations to load
+    if (stationsLoading || !stationInfo) return;
+    
     const fetchLiveData = async () => {
       try {
         const res = await fetch('https://hydrology-jpvl.onrender.com/api/aws-live/all');
         const json = await res.json();
         if (!json?.data) return;
 
-        let stationArr = [];
-
-if (stationKey === 'mana') stationArr = json.data.Mana;
-else if (stationKey === 'lambagad') stationArr = json.data.Lambagad;
-else if (stationKey === 'vasudhara') stationArr = json.data.Vasudhara;
+        // Find station data using station name from database
+        const stationName = stationInfo.station_name;
+        let stationArr = json.data[stationName];
+        
+        // Handle Barrage/Lambagad mapping
+        if (!stationArr && (stationName === "Barrage" || stationName === "Lambagad")) {
+          stationArr = json.data["Lambagad"] || json.data["Barrage"];
+        }
+        
+        // Try case-insensitive match
+        if (!stationArr) {
+          const keys = Object.keys(json.data || {});
+          const matchedKey = keys.find(k => k.toLowerCase() === stationName.toLowerCase());
+          if (matchedKey) stationArr = json.data[matchedKey];
+        }
 
         if (!Array.isArray(stationArr) || !stationArr.length) return;
 
@@ -248,7 +284,7 @@ else if (stationKey === 'vasudhara') stationArr = json.data.Vasudhara;
     fetchLiveData();
     const interval = setInterval(fetchLiveData, 10000);
     return () => clearInterval(interval);
-  }, [stationKey]);
+  }, [stationKey, stationsLoading, stationInfo]);
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 60000);

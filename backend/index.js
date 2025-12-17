@@ -85,8 +85,10 @@ app.use((req, res, next) => {
 // ======================================================
 const pingRoutes = require("./routes/ping");
 const stationStatusRoutes = require("./routes/stationStatus");
+const stationRoutes = require("./routes/stations");
 app.use("/api/ping", pingRoutes);
 app.use("/api/station-status", stationStatusRoutes);
+app.use("/api/stations", stationRoutes);
 app.use("/api/aws-live", awsLiveRoutes);
 app.use("/api/ews-live", ewsLiveRoutes);
 app.use("/api/users", userRoutes);

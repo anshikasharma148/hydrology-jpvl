@@ -3,9 +3,10 @@ export const dynamic = "force-dynamic";
 import { useParams, useRouter } from "next/navigation";
 import Navbar from "../../../components/Navbar";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ArrowLeft, Thermometer, Battery, BatteryCharging, Zap, Sun, Activity, Ruler } from "lucide-react";
 import { useStationStatus } from "../../../hooks/useStationStatus";
+import { useStations } from "../../../hooks/useStations";
 
 import {
   FaWater,
@@ -18,28 +19,56 @@ import {
 
 import StationGraph from "../../../components/EWSStationGraph";
 
-const stationData = {
-  mana: { name: "Mana", image: "/ews_images/manaimg.png" },
-  vasudhara: { name: "Vasudhara", image: "/ews_images/vasudharaimg.png" },
-};
-
 export default function StationPage() {
   const { station } = useParams();
   const router = useRouter();
-  const currentStation = stationData[station];
+  const { ewsStations, loading: stationsLoading } = useStations();
+  
+  // Find station from dynamic list
+  const stationInfo = React.useMemo(() => {
+    if (!ewsStations || ewsStations.length === 0) return null;
+    return ewsStations.find(s => {
+      const slug = s.station_name.toLowerCase().replace(/\s+/g, '_').replace(/[()]/g, '');
+      return slug === station.toLowerCase();
+    });
+  }, [ewsStations, station]);
+  
+  // Build station data dynamically (with fallback for images)
+  const currentStation = React.useMemo(() => {
+    if (stationInfo) {
+      return {
+        name: stationInfo.station_name,
+        image: stationInfo.station_name === "Mana" ? "/ews_images/manaimg.png" :
+               stationInfo.station_name === "Vasudhara" ? "/ews_images/vasudharaimg.png" :
+               "/ews_images/default.png" // Fallback image
+      };
+    }
+    // Fallback for old hardcoded stations
+    const fallback = {
+      mana: { name: "Mana", image: "/ews_images/manaimg.png" },
+      vasudhara: { name: "Vasudhara", image: "/ews_images/vasudharaimg.png" },
+    };
+    return fallback[station.toLowerCase()] || null;
+  }, [stationInfo, station]);
 
   const [showHeading, setShowHeading] = useState(false);
   const [latestData, setLatestData] = useState(null);
   const [loading, setLoading] = useState(true);
   const { getStationStatus } = useStationStatus();
   
-  // Station ID mapping
-  const STATION_ID_MAP = {
-    "mana": "ST019",
-    "vasudhara": "ST020",
-  };
+  // Build Station ID mapping dynamically
+  const STATION_ID_MAP = React.useMemo(() => {
+    const map = {};
+    if (ewsStations) {
+      ewsStations.forEach(s => {
+        const slug = s.station_name.toLowerCase().replace(/\s+/g, '_').replace(/[()]/g, '');
+        map[slug] = s.StationID;
+      });
+    }
+    return map;
+  }, [ewsStations]);
   
-  const stationId = STATION_ID_MAP[station] || null;
+  const stationId = STATION_ID_MAP[station.toLowerCase()] || stationInfo?.StationID || null;
 
   // AUTH GUARD
   useEffect(() => {
@@ -56,6 +85,12 @@ export default function StationPage() {
 
   // Fetch REAL EWS data
   useEffect(() => {
+    // Wait for stations to load
+    if (stationsLoading || !stationInfo) {
+      setLoading(false);
+      return;
+    }
+    
     const fetchLive = async () => {
       try {
         const token = localStorage.getItem("token");
@@ -64,8 +99,16 @@ export default function StationPage() {
         });
 
         const json = await res.json();
-        const key = station === "mana" ? "Mana" : "Vasudhara";
-        const arr = json?.data?.[key] || [];
+        // Use station name from database
+        const stationName = stationInfo.station_name;
+        let arr = json?.data?.[stationName] || [];
+        
+        // Try case-insensitive match
+        if (!arr || arr.length === 0) {
+          const keys = Object.keys(json?.data || {});
+          const matchedKey = keys.find(k => k.toLowerCase() === stationName.toLowerCase());
+          if (matchedKey) arr = json?.data?.[matchedKey] || [];
+        }
 
         if (arr.length > 0) {
           // Find latest record by timestamp
@@ -107,7 +150,7 @@ export default function StationPage() {
     fetchLive();
     const id = setInterval(fetchLive, 15000);
     return () => clearInterval(id);
-  }, [station]);
+  }, [station, stationsLoading, stationInfo]);
 
   if (!currentStation) {
     return (

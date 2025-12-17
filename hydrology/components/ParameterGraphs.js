@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { useStations } from '../hooks/useStations';
 import {
   ResponsiveContainer,
   LineChart,
@@ -199,7 +200,20 @@ export default function ParameterGraphs() {
   const [data, setData] = useState([]);
   const [latestTimestamp, setLatestTimestamp] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [windDirections, setWindDirections] = useState({ Lambagad: null, Mana: null, Vasudhara: null });
+  const { awsStations, loading: stationsLoading } = useStations();
+  
+  // Build wind directions object dynamically from AWS stations
+  const initialWindDirs = React.useMemo(() => {
+    const dirs = {};
+    if (awsStations) {
+      awsStations.forEach(s => {
+        dirs[s.station_name] = null;
+      });
+    }
+    return dirs;
+  }, [awsStations]);
+  
+  const [windDirections, setWindDirections] = useState(initialWindDirs);
 
   const findStationKey = (obj, arr) => {
     for (const k of arr) if (obj[k] !== undefined) return k;
@@ -217,6 +231,9 @@ export default function ParameterGraphs() {
   }, []);
 
   useEffect(() => {
+    // Wait for stations to load
+    if (stationsLoading || !awsStations || awsStations.length === 0) return;
+    
     const fetchData = async () => {
       try {
         const res = await fetch('https://hydrology-jpvl.onrender.com/api/aws-live/all');
@@ -224,15 +241,40 @@ export default function ParameterGraphs() {
         if (!raw?.data) return;
 
         const obj = raw.data;
-        const manaKey = findStationKey(obj, ['Mana', 'mana']);
-        const lambKey = findStationKey(obj, ['Lambagad', 'lambagad']);
-        const vasuKey = findStationKey(obj, ['Vasudhara', 'vasudhara']);
-
-        const stations = [
-          { name: 'Lambagad', key: lambKey },
-          { name: 'Mana', key: manaKey },
-          { name: 'Vasudhara', key: vasuKey },
-        ];
+        
+        // Build stations array dynamically from database - include ALL stations even if no data
+        const stations = awsStations.map(station => {
+          const stationName = station.station_name;
+          // Try to find the key in API response
+          let apiKey = null;
+          let dataArray = null;
+          
+          // Direct match
+          if (obj[stationName] && Array.isArray(obj[stationName])) {
+            apiKey = stationName;
+            dataArray = obj[stationName];
+          } else {
+            // Handle Barrage/Lambagad mapping
+            if (stationName === "Barrage" || stationName === "Lambagad") {
+              apiKey = obj["Lambagad"] ? "Lambagad" : (obj["Barrage"] ? "Barrage" : null);
+              dataArray = obj["Lambagad"] || obj["Barrage"];
+            } else {
+              // Try case-insensitive match
+              const keys = Object.keys(obj);
+              const matchedKey = keys.find(k => k.toLowerCase() === stationName.toLowerCase());
+              if (matchedKey && Array.isArray(obj[matchedKey])) {
+                apiKey = matchedKey;
+                dataArray = obj[matchedKey];
+              }
+            }
+          }
+          
+          return {
+            name: stationName,
+            key: apiKey, // Keep the API key for data lookup
+            hasData: dataArray && dataArray.length > 0
+          };
+        });
 
         // date filter
         const now = toSensorDate(new Date().toISOString());
@@ -260,11 +302,16 @@ export default function ParameterGraphs() {
           'Avg PIR': 'avg_PIR',
         };
 
-        // Store latest wind directions
-        const latestWindDirs = { Lambagad: null, Mana: null, Vasudhara: null };
+        // Store latest wind directions - initialize from AWS stations
+        const latestWindDirs = {};
+        awsStations.forEach(s => {
+          latestWindDirs[s.station_name] = null;
+        });
 
         stations.forEach((st) => {
-          if (!st.key) return;
+          // Skip if no API key or no data array
+          if (!st.key || !obj[st.key] || !Array.isArray(obj[st.key])) return;
+          
           obj[st.key].forEach((row) => {
             const ds = toSensorDateString(row.timestamp);
             if (!ds || !allowed.has(ds)) return;
@@ -287,7 +334,24 @@ export default function ParameterGraphs() {
           });
         });
 
+        // Ensure all stations appear in the data even if they have no data
+        // This ensures they show up in the legend and graph (with null values)
         const sorted = Object.values(merged).sort((a, b) => a.time - b.time);
+        
+        // If we have time points, ensure all stations are represented in each time point
+        if (sorted.length > 0) {
+          sorted.forEach(timePoint => {
+            stations.forEach(st => {
+              Object.keys(map).forEach(param => {
+                const key = `${st.name}-${param}`;
+                if (!(key in timePoint)) {
+                  timePoint[key] = null;
+                }
+              });
+            });
+          });
+        }
+        
         setData(sorted);
         setWindDirections(latestWindDirs);
         if (sorted.length) setLatestTimestamp(sorted[sorted.length - 1].time);
@@ -297,9 +361,24 @@ export default function ParameterGraphs() {
     };
 
     fetchData();
-  }, [days]);
+  }, [days, stationsLoading, awsStations]);
 
-  const stationNames = Object.keys(colors);
+  // Use dynamic station names from database, with fallback colors
+  const stationNames = React.useMemo(() => {
+    if (!awsStations || awsStations.length === 0) return Object.keys(colors);
+    return awsStations.map(s => s.station_name);
+  }, [awsStations]);
+  
+  // Generate colors for stations dynamically
+  const stationColors = React.useMemo(() => {
+    const colorArray = ['#ff4c4c', '#0099cc', '#4caf50', '#6a1b9a', '#1e88e5', '#ffb300'];
+    const colorMap = {};
+    stationNames.forEach((name, idx) => {
+      // Use existing colors for known stations, or assign from array
+      colorMap[name] = colors[name] || colorArray[idx % colorArray.length];
+    });
+    return colorMap;
+  }, [stationNames]);
 
   return (
     <div className="p-4 sm:p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50 min-h-screen">
@@ -342,10 +421,13 @@ export default function ParameterGraphs() {
         <div className="space-y-8">
           {parameters.map((param) => {
             const ParamIcon = param.icon;
-            const stats = stationNames.map((station) => ({
-              station,
-              ...calculateStats(data, param.name, station),
-            }));
+            const stats = stationNames.map((station) => {
+              const stationStats = calculateStats(data, param.name, station);
+              return {
+                station,
+                ...stationStats,
+              };
+            });
 
             return (
               <div
@@ -460,8 +542,8 @@ export default function ParameterGraphs() {
                         <defs>
                           {stationNames.map((station) => (
                             <linearGradient key={station} id={`gradient-${station}-${param.name}`} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor={colors[station]} stopOpacity={0.3}/>
-                              <stop offset="95%" stopColor={colors[station]} stopOpacity={0}/>
+                              <stop offset="5%" stopColor={stationColors[station]} stopOpacity={0.3}/>
+                              <stop offset="95%" stopColor={stationColors[station]} stopOpacity={0}/>
                             </linearGradient>
                           ))}
                         </defs>
@@ -507,12 +589,12 @@ export default function ParameterGraphs() {
                             key={station}
                             type="monotone"
                             dataKey={`${station}-${param.name}`}
-                            stroke={colors[station]}
+                            stroke={stationColors[station]}
                             strokeWidth={3.5}
                             dot={false}
                             activeDot={{ 
                               r: 7, 
-                              fill: colors[station], 
+                              fill: stationColors[station], 
                               strokeWidth: 3, 
                               stroke: '#fff',
                               style: { filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }
@@ -628,8 +710,8 @@ export default function ParameterGraphs() {
                                   >
                                     <polygon
                                       points="0 0, 8 2.5, 0 5"
-                                      fill={colors[station]}
-                                      stroke={colors[station]}
+                                      fill={stationColors[station]}
+                                      stroke={stationColors[station]}
                                       strokeWidth="0.5"
                                     />
                                   </marker>
@@ -639,7 +721,7 @@ export default function ParameterGraphs() {
                                   y1={tailY}
                                   x2={arrowX}
                                   y2={arrowY}
-                                  stroke={colors[station]}
+                                  stroke={stationColors[station]}
                                   strokeWidth="1.2"
                                   markerEnd={`url(#arrowhead-${stationIdx}-${param.name})`}
                                   opacity="0.9"
@@ -658,7 +740,7 @@ export default function ParameterGraphs() {
                                 <div
                                   className="px-2.5 py-1.5 rounded-lg shadow-xl border-2 border-white"
                                   style={{
-                                    backgroundColor: colors[station],
+                                    backgroundColor: stationColors[station],
                                   }}
                                 >
                                   <div className="text-white font-bold text-xs sm:text-sm text-center whitespace-nowrap">
@@ -686,7 +768,7 @@ export default function ParameterGraphs() {
                             >
                               <div
                                 className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: colors[station] }}
+                                style={{ backgroundColor: stationColors[station] }}
                               />
                               <span className="text-xs font-semibold text-gray-700">
                                 {displayNames[station] || station}: {windDir !== null && !isNaN(windDir) ? `${windDir.toFixed(0)}° (${directionLabel})` : 'N/A'}

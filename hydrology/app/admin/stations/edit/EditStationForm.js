@@ -1,10 +1,10 @@
 'use client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import AdminLayout from '../../../components/AdminLayout';
-import { useNotification } from '../../../components/NotificationToast';
-import LoadingSpinner from '../../../components/LoadingSpinner';
+import AdminLayout from '../../../../components/AdminLayout';
+import { useNotification } from '../../../../components/NotificationToast';
+import LoadingSpinner from '../../../../components/LoadingSpinner';
 
 // Standard AWS fields
 const AWS_STANDARD_FIELDS = [
@@ -62,16 +62,21 @@ const getBackendUrl = () => {
   return process.env.NEXT_PUBLIC_BACKEND_URL || "https://hydrology-jpvl.onrender.com";
 };
 
-const StationForm = () => {
+const EditStationForm = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { showAlert, showConfirm } = useNotification();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [fetching, setFetching] = useState(true);
+
+  const stationId = searchParams.get('stationId');
+  const serviceId = searchParams.get('serviceId');
 
   // Form data
   const [formData, setFormData] = useState({
-    serviceType: '', // AWS or EWS
+    serviceType: '',
     stationId: '',
     stationName: '',
     deviceId: '',
@@ -86,10 +91,84 @@ const StationForm = () => {
 
   // Field selection and column mappings
   const [selectedFields, setSelectedFields] = useState([]);
-  const [columnMappings, setColumnMappings] = useState({}); // { fieldName: 'A', ... }
-  const [customFields, setCustomFields] = useState([]); // [{ name, type, column }]
+  const [columnMappings, setColumnMappings] = useState({});
+  const [customFields, setCustomFields] = useState([]);
 
   const steps = ['Basic Info', 'Location', 'Field Mapping', 'Review'];
+
+  // Fetch existing station data
+  useEffect(() => {
+    if (!stationId || !serviceId) {
+      showAlert('Station ID and Service ID are required', 'error');
+      router.push('/admin/station-management');
+      return;
+    }
+
+    const fetchStation = async () => {
+      try {
+        setFetching(true);
+        const backendUrl = getBackendUrl();
+        const response = await fetch(`${backendUrl}/api/stations/${stationId}/${serviceId}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch station data');
+        }
+
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          const station = result.data;
+          
+          // Populate form data
+          setFormData({
+            serviceType: station.ServicesID,
+            stationId: station.StationID,
+            stationName: station.station_name,
+            deviceId: station.DeviceID,
+            csvFolderPath: station.csv_folder_path,
+            longitude: station.Longitude || '',
+            latitude: station.Latitude || '',
+            country: station.Country || '',
+            state: station.State || '',
+            district: station.District || '',
+            pinCode: station.PinCode || ''
+          });
+
+          // Populate selected fields
+          setSelectedFields(station.selected_fields || []);
+
+          // Populate column mappings
+          // Create reverse mapping: field name -> column letter
+          const mappings = {};
+          if (station.column_mappings) {
+            Object.keys(station.column_mappings).forEach(columnLetter => {
+              const fieldName = station.column_mappings[columnLetter];
+              // Skip timestamp mapping (column A)
+              if (fieldName !== 'timestamp' && fieldName) {
+                mappings[fieldName] = columnLetter;
+              }
+            });
+          }
+          setColumnMappings(mappings);
+
+          // Populate custom fields
+          setCustomFields(station.custom_fields || []);
+        } else {
+          showAlert('Station not found', 'error');
+          router.push('/admin/station-management');
+        }
+      } catch (error) {
+        console.error('Error fetching station:', error);
+        showAlert('Failed to load station data', 'error');
+        router.push('/admin/station-management');
+      } finally {
+        setFetching(false);
+        setLoading(false);
+      }
+    };
+
+    fetchStation();
+  }, [stationId, serviceId, router, showAlert]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -102,7 +181,6 @@ const StationForm = () => {
   const handleServiceTypeChange = (e) => {
     const serviceType = e.target.value;
     setFormData(prev => ({ ...prev, serviceType }));
-    // Reset field selections when service type changes
     setSelectedFields([]);
     setColumnMappings({});
   };
@@ -110,7 +188,6 @@ const StationForm = () => {
   const handleFieldToggle = (fieldName) => {
     setSelectedFields(prev => {
       if (prev.includes(fieldName)) {
-        // Remove field and its mapping
         const newMappings = { ...columnMappings };
         delete newMappings[fieldName];
         setColumnMappings(newMappings);
@@ -155,14 +232,12 @@ const StationForm = () => {
       showAlert('Please select at least one field to map', 'warning');
       return false;
     }
-    // Check all selected fields have column mappings
     for (const field of selectedFields) {
       if (!columnMappings[field]) {
         showAlert(`Please select a CSV column for field: ${field}`, 'warning');
         return false;
       }
     }
-    // Validate custom fields
     for (const customField of customFields) {
       if (!customField.name || !customField.column) {
         showAlert('Please fill in all custom field details', 'warning');
@@ -198,8 +273,6 @@ const StationForm = () => {
       });
 
       const payload = {
-        StationID: formData.stationId,
-        ServicesID: formData.serviceType,
         DeviceID: formData.deviceId,
         station_name: formData.stationName,
         csv_folder_path: formData.csvFolderPath,
@@ -214,8 +287,8 @@ const StationForm = () => {
         PinCode: formData.pinCode || null
       };
 
-      const response = await fetch(`${backendUrl}/api/stations`, {
-        method: 'POST',
+      const response = await fetch(`${backendUrl}/api/stations/${stationId}/${serviceId}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -223,48 +296,27 @@ const StationForm = () => {
         body: JSON.stringify(payload)
       });
 
-      // Check if response is OK before parsing JSON
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('API Error:', response.status, errorText);
         throw new Error(`Server error: ${response.status} - ${errorText.substring(0, 100)}`);
       }
 
       const result = await response.json();
 
       if (result.success) {
-        showAlert('Station registered successfully!', 'success');
-        // Reset form
-        setFormData({
-          serviceType: '',
-          stationId: '',
-          stationName: '',
-          deviceId: '',
-          csvFolderPath: '',
-          longitude: '',
-          latitude: '',
-          country: '',
-          state: '',
-          district: '',
-          pinCode: ''
-        });
-        setSelectedFields([]);
-        setColumnMappings({});
-        setCustomFields([]);
-        setCurrentStep(1);
-        // Optionally redirect to management page
+        showAlert('Station updated successfully!', 'success');
         setTimeout(() => {
           router.push('/admin/station-management');
-        }, 2000);
+        }, 1500);
       } else {
-        showAlert(result.error || 'Failed to register station', 'error');
+        showAlert(result.error || 'Failed to update station', 'error');
       }
     } catch (error) {
-      console.error('Error registering station:', error);
-      const errorMessage = error.message || 'An error occurred while registering the station';
+      console.error('Error updating station:', error);
+      const errorMessage = error.message || 'An error occurred while updating the station';
       showAlert(
         errorMessage.includes('404') || errorMessage.includes('Not Found')
-          ? 'API endpoint not found. Please ensure the backend server is running and has been restarted to load the new routes.'
+          ? 'API endpoint not found. Please ensure the backend server is running and has been restarted.'
           : errorMessage,
         'error'
       );
@@ -276,12 +328,12 @@ const StationForm = () => {
 
   const standardFields = formData.serviceType === 'AWS' ? AWS_STANDARD_FIELDS : EWS_STANDARD_FIELDS;
 
-  if (loading) {
-    return <LoadingSpinner message="Registering station..." />;
+  if (fetching || loading) {
+    return <LoadingSpinner message={fetching ? "Loading station data..." : "Updating station..."} />;
   }
 
   return (
-    <AdminLayout title="Register New Station" subtitle="Add a new station with CSV column mapping">
+    <AdminLayout title="Edit Station" subtitle={`Update configuration for ${formData.stationName || 'station'}`}>
       <div className="w-full max-w-6xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-6 sm:p-10">
           {/* Stepper */}
@@ -356,7 +408,7 @@ const StationForm = () => {
                     </div>
                   </div>
 
-                  {/* Station ID */}
+                  {/* Station ID (read-only) */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Station ID <span className="text-red-500">*</span>
@@ -365,11 +417,10 @@ const StationForm = () => {
                       type="text"
                       name="stationId"
                       value={formData.stationId}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="e.g., ST021"
-                      required
+                      readOnly
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-gray-100 text-gray-600 cursor-not-allowed"
                     />
+                    <p className="mt-1 text-xs text-gray-500">Station ID cannot be changed</p>
                   </div>
 
                   {/* Station Name */}
@@ -577,11 +628,15 @@ const StationForm = () => {
                                   handleColumnMappingChange(field.name, e.target.value);
                                 }
                               }}
-                              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-medium"
                             >
-                              <option value="">Select column...</option>
+                              {!columnMappings[field.name] && (
+                                <option value="">Select column...</option>
+                              )}
                               {COLUMN_LETTERS.map(letter => (
-                                <option key={letter} value={letter}>Column {letter}</option>
+                                <option key={letter} value={letter}>
+                                  Column {letter}
+                                </option>
                               ))}
                               <option value="__custom__">--- Custom ---</option>
                             </select>
@@ -640,30 +695,28 @@ const StationForm = () => {
                           </div>
                           <div className="w-24">
                             <label className="block text-xs font-medium text-gray-700 mb-1">CSV Column</label>
-                            <div className="flex gap-2 items-center">
-                              <select
-                                value={field.column}
-                                onChange={(e) => {
-                                  if (e.target.value === '__custom__') {
-                                    const customValue = prompt('Enter custom column letter (e.g., A, B, AA, AB):');
-                                    if (customValue && customValue.trim()) {
-                                      handleCustomFieldChange(index, 'column', customValue.trim().toUpperCase());
-                                    }
-                                  } else {
-                                    handleCustomFieldChange(index, 'column', e.target.value);
+                            <select
+                              value={field.column}
+                              onChange={(e) => {
+                                if (e.target.value === '__custom__') {
+                                  const customValue = prompt('Enter custom column letter (e.g., A, B, AA, AB):');
+                                  if (customValue && customValue.trim()) {
+                                    handleCustomFieldChange(index, 'column', customValue.trim().toUpperCase());
                                   }
-                                }}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                              >
-                                {COLUMN_LETTERS.map(letter => (
-                                  <option key={letter} value={letter}>Column {letter}</option>
-                                ))}
-                                <option value="__custom__">--- Custom ---</option>
-                              </select>
-                              {field.column && !COLUMN_LETTERS.includes(field.column) && (
-                                <span className="text-xs text-gray-500">({field.column})</span>
-                              )}
-                            </div>
+                                } else {
+                                  handleCustomFieldChange(index, 'column', e.target.value);
+                                }
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white font-medium"
+                            >
+                              {COLUMN_LETTERS.map(letter => (
+                                <option key={letter} value={letter}>Column {letter}</option>
+                              ))}
+                              <option value="__custom__">--- Custom ---</option>
+                            </select>
+                            {field.column && !COLUMN_LETTERS.includes(field.column) && (
+                              <span className="text-xs text-gray-500 ml-2">({field.column})</span>
+                            )}
                           </div>
                           <button
                             type="button"
@@ -762,7 +815,7 @@ const StationForm = () => {
                     disabled={isSubmitting}
                     className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isSubmitting ? 'Registering...' : 'Register Station'}
+                    {isSubmitting ? 'Updating...' : 'Update Station'}
                   </button>
                 </div>
               </motion.div>
@@ -774,4 +827,5 @@ const StationForm = () => {
   );
 };
 
-export default StationForm;
+export default EditStationForm;
+

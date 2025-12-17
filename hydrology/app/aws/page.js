@@ -26,12 +26,9 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useStations } from "../../hooks/useStations";
 
-const displayNames = {
-  mana: "Mana",
-  lambagad: "Barrage",
-  vasudhara: "Vasudhara",
-};
+// Display names will be built dynamically from stations
 
 // Loading skeleton component
 const StationCardSkeleton = () => (
@@ -97,7 +94,73 @@ const getPrecipitationIcon = () => <Umbrella className="w-5 h-5 sm:w-6 sm:h-6 te
 const getWeightIcon = () => <Scale className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />;
 const getPIRIcon = () => <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600" />;
 
-const getWindIcon = (speed) =>
+  // Field mapping: database field name -> station object key
+  const fieldToKeyMap = {
+    'temperature': 'temperature',
+    'pressure': 'pressure',
+    'relative_humidity': 'humidity',
+    'windspeed': 'wind_speed',
+    'winddirection': 'wind_direction',
+    'rain': 'rain',
+    'precipitation': 'precipitation',
+    'bucket_weight': 'bucket_weight',
+    'PIR': 'PIR',
+    'avg_PIR': 'avg_PIR',
+  };
+
+  // Filter parameters based on selected fields
+  const getFilteredParams = (selectedFields, station) => {
+    if (!selectedFields || selectedFields.length === 0) {
+      // If no selected fields, show all (backward compatibility)
+      return {
+        atmospheric: [
+          { label: "Pressure", value: station.pressure, unit: "hPa", icon: getPressureIcon(), dbField: "pressure" },
+          { label: "Humidity", value: station.humidity, unit: "%", icon: getHumidityIcon(station.humidity), dbField: "relative_humidity" },
+        ],
+        precipitation: [
+          { label: "Rain", value: station.rain, unit: "mm", icon: getRainIcon(station.rain), dbField: "rain" },
+          { label: "Snow", value: station.precipitation, unit: "mm", icon: getPrecipitationIcon(), dbField: "precipitation" },
+          { label: "Bucket Weight", value: station.bucket_weight, unit: "gm", icon: getWeightIcon(), dbField: "bucket_weight" },
+        ],
+        solar: [
+          { label: "Solar Radiation", value: station.PIR, unit: "W/m²", icon: getPIRIcon(), dbField: "PIR" },
+          { label: "Avg Solar Radiation", value: station.avg_PIR, unit: "W/m²", icon: getPIRIcon(), dbField: "avg_PIR" },
+        ],
+        wind: [
+          { label: "Wind Speed", value: station.wind_speed, unit: "m/s", icon: getWindIcon(station.wind_speed), dbField: "windspeed" },
+        ],
+      };
+    }
+
+    const allParams = {
+      atmospheric: [
+        { label: "Pressure", value: station.pressure, unit: "hPa", icon: getPressureIcon(), dbField: "pressure" },
+        { label: "Humidity", value: station.humidity, unit: "%", icon: getHumidityIcon(station.humidity), dbField: "relative_humidity" },
+      ],
+      precipitation: [
+        { label: "Rain", value: station.rain, unit: "mm", icon: getRainIcon(station.rain), dbField: "rain" },
+        { label: "Snow", value: station.precipitation, unit: "mm", icon: getPrecipitationIcon(), dbField: "precipitation" },
+        { label: "Bucket Weight", value: station.bucket_weight, unit: "gm", icon: getWeightIcon(), dbField: "bucket_weight" },
+      ],
+      solar: [
+        { label: "Solar Radiation", value: station.PIR, unit: "W/m²", icon: getPIRIcon(), dbField: "PIR" },
+        { label: "Avg Solar Radiation", value: station.avg_PIR, unit: "W/m²", icon: getPIRIcon(), dbField: "avg_PIR" },
+      ],
+      wind: [
+        { label: "Wind Speed", value: station.wind_speed, unit: "m/s", icon: getWindIcon(station.wind_speed), dbField: "windspeed" },
+      ],
+    };
+
+    // Filter each category
+    return {
+      atmospheric: allParams.atmospheric.filter(p => selectedFields.includes(p.dbField)),
+      precipitation: allParams.precipitation.filter(p => selectedFields.includes(p.dbField)),
+      solar: allParams.solar.filter(p => selectedFields.includes(p.dbField)),
+      wind: allParams.wind.filter(p => selectedFields.includes(p.dbField)),
+    };
+  };
+
+  const getWindIcon = (speed) =>
   speed > 8 ? (
     <Wind className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
   ) : speed > 4 ? (
@@ -165,6 +228,7 @@ const getTimeBasedTheme = () => {
 
 export default function AwsPage() {
   const router = useRouter();
+  const { awsStations: awsStationsData, loading: stationsLoading } = useStations();
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -173,13 +237,34 @@ export default function AwsPage() {
   const [currentTheme, setCurrentTheme] = useState(getTimeBasedTheme());
   const { getStationStatus } = useStationStatus();
   
-  // Station ID mapping
-  const STATION_ID_MAP = {
-    "mana": "ST019",
-    "lambagad": "ST015",
-    "barrage": "ST015",
-    "vasudhara": "ST020",
-  };
+  // Build display names and station ID mapping dynamically
+  const displayNames = React.useMemo(() => {
+    const names = {};
+    awsStationsData.forEach(station => {
+      const slug = station.station_name.toLowerCase().replace(/\s+/g, '_').replace(/[()]/g, '');
+      names[slug] = station.station_name;
+      // Handle aliases
+      if (station.station_name === "Lambagad" || station.station_name === "Barrage") {
+        names["lambagad"] = "Barrage";
+        names["barrage"] = "Barrage";
+      }
+    });
+    return names;
+  }, [awsStationsData]);
+  
+  const STATION_ID_MAP = React.useMemo(() => {
+    const map = {};
+    awsStationsData.forEach(station => {
+      const slug = station.station_name.toLowerCase().replace(/\s+/g, '_').replace(/[()]/g, '');
+      map[slug] = station.StationID;
+      // Handle aliases
+      if (station.station_name === "Lambagad" || station.station_name === "Barrage") {
+        map["lambagad"] = station.StationID;
+        map["barrage"] = station.StationID;
+      }
+    });
+    return map;
+  }, [awsStationsData]);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -197,72 +282,82 @@ export default function AwsPage() {
       if (isManualRefresh) setRefreshing(true);
       setError(null);
 
+      // Don't fetch if stations are still loading
+      if (stationsLoading || awsStationsData.length === 0) {
+        setLoading(false);
+        if (isManualRefresh) setRefreshing(false);
+        return;
+      }
+
       const res = await fetch("https://hydrology-jpvl.onrender.com/api/aws-live/all");
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
 
       const json = await res.json();
       if (!json?.data) throw new Error("No data received from server");
 
-      const { Mana, Lambagad, Vasudhara } = json.data;
-
       const s = [];
 
-      // LAMBAGAD (Barrage) - First
-      if (Lambagad?.length > 0) {
-        const d = Lambagad[0];
-        s.push({
-          name: "lambagad",
-          temperature: Number(d.temperature || 0).toFixed(1),
-          pressure: Number(d.pressure || 0).toFixed(1),
-          humidity: Number(d.relative_humidity || 0).toFixed(1),
-          rain: Number(d.rain || 0).toFixed(1),
-          precipitation: Number(d.precipitation || 0).toFixed(1),
-          bucket_weight: Number(d.bucket_weight || 0).toFixed(1),
-          PIR: Number(d.PIR || 0).toFixed(1),
-          avg_PIR: Number(d.avg_PIR || 0).toFixed(1),
-          wind_speed: Number(d.windspeed || 0).toFixed(1),
-          wind_direction: Number(d.winddirection || 0).toFixed(1),
-          lastUpdate: d.timestamp || new Date().toISOString(),
-        });
-      }
-
-      // MANA - Second
-      if (Mana?.length > 0) {
-        const d = Mana[0];
-        s.push({
-          name: "mana",
-          temperature: Number(d.temperature || 0).toFixed(1),
-          pressure: Number(d.pressure || 0).toFixed(1),
-          humidity: Number(d.relative_humidity || 0).toFixed(1),
-          rain: Number(d.rain || 0).toFixed(1),
-          precipitation: Number(d.precipitation || 0).toFixed(1),
-          bucket_weight: Number(d.bucket_weight || 0).toFixed(1),
-          PIR: Number(d.PIR || 0).toFixed(1),
-          avg_PIR: Number(d.avg_PIR || 0).toFixed(1),
-          wind_speed: Number(d.windspeed || 0).toFixed(1),
-          wind_direction: Number(d.winddirection || 0).toFixed(1),
-          lastUpdate: d.timestamp || new Date().toISOString(),
-        });
-      }
-
-      // VASUDHARA - Third
-      if (Vasudhara?.length > 0) {
-        const d = Vasudhara[0];
-        s.push({
-          name: "vasudhara",
-          temperature: Number(d.temperature || 0).toFixed(1),
-          pressure: Number(d.pressure || 0).toFixed(1),
-          humidity: Number(d.relative_humidity || 0).toFixed(1),
-          rain: Number(d.rain || 0).toFixed(1),
-          precipitation: Number(d.precipitation || 0).toFixed(1),
-          bucket_weight: Number(d.bucket_weight || 0).toFixed(1),
-          PIR: Number(d.PIR || 0).toFixed(1),
-          avg_PIR: Number(d.avg_PIR || 0).toFixed(1),
-          wind_speed: Number(d.windspeed || 0).toFixed(1),
-          wind_direction: Number(d.winddirection || 0).toFixed(1),
-          lastUpdate: d.timestamp || new Date().toISOString(),
-        });
-      }
+      // Iterate over all AWS stations dynamically
+      awsStationsData.forEach(station => {
+        const stationName = station.station_name;
+        // Backend API returns keys like "Lambagad", "Mana", "Vasudhara"
+        // But database might have "Barrage" instead of "Lambagad"
+        // Try multiple name variations
+        let stationData = json.data?.[stationName];
+        if (!stationData) {
+          // Handle Barrage/Lambagad mapping
+          if (stationName === "Barrage" || stationName === "Lambagad") {
+            stationData = json.data?.["Lambagad"] || json.data?.["Barrage"];
+          }
+        }
+        if (!stationData) {
+          // Try case-insensitive match
+          const keys = Object.keys(json.data || {});
+          const matchedKey = keys.find(k => k.toLowerCase() === stationName.toLowerCase());
+          if (matchedKey) stationData = json.data?.[matchedKey];
+        }
+        
+        const slug = stationName.toLowerCase().replace(/\s+/g, '_').replace(/[()]/g, '');
+        
+        // Always add station, even if no data (will show as offline)
+        if (stationData?.length > 0) {
+          const d = stationData[0];
+          s.push({
+            name: slug,
+            displayName: stationName,
+            temperature: Number(d.temperature || 0).toFixed(1),
+            pressure: Number(d.pressure || 0).toFixed(1),
+            humidity: Number(d.relative_humidity || 0).toFixed(1),
+            rain: Number(d.rain || 0).toFixed(1),
+            precipitation: Number(d.precipitation || 0).toFixed(1),
+            bucket_weight: Number(d.bucket_weight || 0).toFixed(1),
+            PIR: Number(d.PIR || 0).toFixed(1),
+            avg_PIR: Number(d.avg_PIR || 0).toFixed(1),
+            wind_speed: Number(d.windspeed || 0).toFixed(1),
+            wind_direction: Number(d.winddirection || 0).toFixed(1),
+            lastUpdate: d.timestamp || new Date().toISOString(),
+            selectedFields: station.selected_fields || [],
+          });
+        } else {
+          // Add station with null data (will show as offline)
+          s.push({
+            name: slug,
+            displayName: stationName,
+            temperature: null,
+            pressure: null,
+            humidity: null,
+            rain: null,
+            precipitation: null,
+            bucket_weight: null,
+            PIR: null,
+            avg_PIR: null,
+            wind_speed: null,
+            wind_direction: null,
+            lastUpdate: null,
+            selectedFields: station.selected_fields || [],
+          });
+        }
+      });
 
       setStations(s);
       setLastUpdated(new Date());
@@ -276,10 +371,25 @@ export default function AwsPage() {
   };
 
   useEffect(() => {
+    // Wait for stations to load
+    if (stationsLoading) {
+      setLoading(true);
+      return;
+    }
+    
+    // If no stations, show empty state
+    if (awsStationsData.length === 0) {
+      setStations([]);
+      setLoading(false);
+      return;
+    }
+    
+    // Fetch data and set up interval
     fetchAWSData();
-    const i = setInterval(() => fetchAWSData(), 10000);
+    const i = setInterval(() => fetchAWSData(), 30000);
     return () => clearInterval(i);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stationsLoading, awsStationsData.length]);
 
   const handleRefresh = () => fetchAWSData(true);
 
@@ -397,12 +507,13 @@ export default function AwsPage() {
           </div>
         ) : (
           stations.map((station, i) => {
-            const displayName = displayNames[station.name] || station.name;
+            const displayName = station.displayName || displayNames[station.name] || station.name;
             const windDirectionText = getWindDirectionText(station.wind_direction);
             const stationId = STATION_ID_MAP[station.name.toLowerCase()] || null;
             const statusInfo = getStationStatus(stationId, "AWS", station.lastUpdate, 20);
             const isMaintenance = statusInfo.status === "maintenance";
             const isLive = statusInfo.status === "live";
+            const selectedFields = station.selectedFields || [];
 
             return (
               <div
@@ -450,16 +561,18 @@ export default function AwsPage() {
                       <div className="ml-1 sm:ml-2 flex-shrink-0 group-hover:scale-110 transition-transform duration-300">{currentTheme.headerIcon}</div>
                     </div>
 
-                    <div
-                      className={`flex items-center bg-gradient-to-r ${currentTheme.temperatureBg} rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 border-2 ${currentTheme.temperatureBorder} shadow-lg group-hover:shadow-xl transition-all duration-300 flex-shrink-0 group-hover:scale-105`}
-                    >
-                      <div className="group-hover:rotate-12 transition-transform duration-300">
-                      {getTemperatureIcon(parseFloat(station.temperature))}
+                    {(!selectedFields.length || selectedFields.includes('temperature')) && (
+                      <div
+                        className={`flex items-center bg-gradient-to-r ${currentTheme.temperatureBg} rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 border-2 ${currentTheme.temperatureBorder} shadow-lg group-hover:shadow-xl transition-all duration-300 flex-shrink-0 group-hover:scale-105`}
+                      >
+                        <div className="group-hover:rotate-12 transition-transform duration-300">
+                        {getTemperatureIcon(parseFloat(station.temperature))}
+                        </div>
+                        <span className="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-800 ml-1 sm:ml-1.5">
+                          {station.temperature || '-'}°C
+                        </span>
                       </div>
-                      <span className="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-800 ml-1 sm:ml-1.5">
-                        {station.temperature}°C
-                      </span>
-                    </div>
+                    )}
                   </div>
 
                   {/* Parameters - Categorized */}
@@ -467,12 +580,12 @@ export default function AwsPage() {
                     className={`rounded-2xl sm:rounded-[30px] py-1.5 sm:py-2 px-2 sm:px-3 mb-2 sm:mb-3 bg-gradient-to-br ${currentTheme.paramBg} border-2 border-blue-200/60 backdrop-blur-sm flex-grow shadow-inner space-y-1.5 sm:space-y-2`}
                   >
                     {/* Atmospheric Conditions */}
-                    <div className="space-y-0.5 sm:space-y-1">
-                      <h4 className="text-xs sm:text-sm font-bold text-blue-600 uppercase tracking-wide mb-0.5 px-1 text-center">Atmospheric</h4>
-                    {[
-                      { label: "Pressure", value: station.pressure, unit: "hPa", icon: getPressureIcon() },
-                      { label: "Humidity", value: station.humidity, unit: "%", icon: getHumidityIcon(station.humidity) },
-                      ].map((item, idx) => (
+                    {(() => {
+                      const filteredParams = getFilteredParams(selectedFields, station);
+                      return filteredParams.atmospheric.length > 0 && (
+                        <div className="space-y-0.5 sm:space-y-1">
+                          <h4 className="text-xs sm:text-sm font-bold text-blue-600 uppercase tracking-wide mb-0.5 px-1 text-center">Atmospheric</h4>
+                          {filteredParams.atmospheric.map((item, idx) => (
                         <div
                           key={idx}
                           className="flex items-center space-x-2 sm:space-x-2.5 group/item hover:bg-white/95 rounded-md p-0.5 sm:p-1 transition-all duration-300 hover:shadow-sm hover:scale-[1.01] cursor-pointer"
@@ -489,17 +602,18 @@ export default function AwsPage() {
                             {item.value} {item.unit}
                           </span>
                         </div>
-                      ))}
-                    </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
 
                     {/* Precipitation */}
-                    <div className="space-y-0.5 sm:space-y-1">
-                      <h4 className="text-xs sm:text-sm font-bold text-cyan-600 uppercase tracking-wide mb-0.5 px-1 text-center">Precipitation</h4>
-                      {[
-                      { label: "Rain", value: station.rain, unit: "mm", icon: getRainIcon(station.rain) },
-                        { label: "Snow", value: station.precipitation, unit: "mm", icon: getPrecipitationIcon() },
-                      { label: "Bucket Weight", value: station.bucket_weight, unit: "gm", icon: getWeightIcon() },
-                      ].map((item, idx) => (
+                    {(() => {
+                      const filteredParams = getFilteredParams(selectedFields, station);
+                      return filteredParams.precipitation.length > 0 && (
+                        <div className="space-y-0.5 sm:space-y-1">
+                          <h4 className="text-xs sm:text-sm font-bold text-cyan-600 uppercase tracking-wide mb-0.5 px-1 text-center">Precipitation</h4>
+                          {filteredParams.precipitation.map((item, idx) => (
                         <div
                           key={idx}
                           className="flex items-center space-x-2 sm:space-x-2.5 group/item hover:bg-white/95 rounded-md p-0.5 sm:p-1 transition-all duration-300 hover:shadow-sm hover:scale-[1.01] cursor-pointer"
@@ -516,16 +630,18 @@ export default function AwsPage() {
                             {item.value} {item.unit}
                           </span>
                         </div>
-                      ))}
-                    </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
 
                     {/* Solar Energy */}
-                    <div className="space-y-0.5 sm:space-y-1">
-                      <h4 className="text-xs sm:text-sm font-bold text-amber-600 uppercase tracking-wide mb-0.5 px-1 text-center">Solar Energy</h4>
-                      {[
-                      { label: "Solar Radiation", value: station.PIR, unit: "W/m²", icon: getPIRIcon() },
-                      { label: "Avg Solar Radiation", value: station.avg_PIR, unit: "W/m²", icon: getPIRIcon() },
-                    ].map((item, idx) => (
+                    {(() => {
+                      const filteredParams = getFilteredParams(selectedFields, station);
+                      return filteredParams.solar.length > 0 && (
+                        <div className="space-y-0.5 sm:space-y-1">
+                          <h4 className="text-xs sm:text-sm font-bold text-amber-600 uppercase tracking-wide mb-0.5 px-1 text-center">Solar Energy</h4>
+                          {filteredParams.solar.map((item, idx) => (
                       <div
                         key={idx}
                           className="flex items-center space-x-2 sm:space-x-2.5 group/item hover:bg-white/95 rounded-md p-0.5 sm:p-1 transition-all duration-300 hover:shadow-sm hover:scale-[1.01] cursor-pointer"
@@ -542,15 +658,18 @@ export default function AwsPage() {
                           {item.value} {item.unit}
                         </span>
                       </div>
-                    ))}
-                    </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
 
                     {/* Wind */}
-                    <div className="space-y-0.5 sm:space-y-1">
-                      <h4 className="text-xs sm:text-sm font-bold text-indigo-600 uppercase tracking-wide mb-0.5 px-1 text-center">Wind</h4>
-                      {[
-                        { label: "Wind Speed", value: station.wind_speed, unit: "m/s", icon: getWindIcon(station.wind_speed) },
-                      ].map((item, idx) => (
+                    {(() => {
+                      const filteredParams = getFilteredParams(selectedFields, station);
+                      return filteredParams.wind.length > 0 && (
+                        <div className="space-y-0.5 sm:space-y-1">
+                          <h4 className="text-xs sm:text-sm font-bold text-indigo-600 uppercase tracking-wide mb-0.5 px-1 text-center">Wind</h4>
+                          {filteredParams.wind.map((item, idx) => (
                         <div
                           key={idx}
                           className="flex items-center space-x-2 sm:space-x-2.5 group/item hover:bg-white/95 rounded-md p-0.5 sm:p-1 transition-all duration-300 hover:shadow-sm hover:scale-[1.01] cursor-pointer"
@@ -567,12 +686,15 @@ export default function AwsPage() {
                             {item.value} {item.unit}
                           </span>
                         </div>
-                      ))}
-                    </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
 
-                  {/* Wind Direction Compass */}
-                  <div className="flex flex-col items-center p-2 sm:p-3 bg-gradient-to-br from-blue-100 via-indigo-100 to-purple-100 rounded-xl sm:rounded-2xl border-2 border-blue-300/60 shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-[1.02]">
+                  {/* Wind Direction Compass - Only show if winddirection is selected */}
+                  {(!selectedFields.length || (selectedFields.includes('windspeed') || selectedFields.includes('winddirection'))) && (
+                    <div className="flex flex-col items-center p-2 sm:p-3 bg-gradient-to-br from-blue-100 via-indigo-100 to-purple-100 rounded-xl sm:rounded-2xl border-2 border-blue-300/60 shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-[1.02]">
                     <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
                       <div className="p-1.5 sm:p-2 bg-white/80 rounded-lg shadow-sm">
                       {getWindIcon(station.wind_speed)}
@@ -631,7 +753,8 @@ export default function AwsPage() {
                         </div>
                       </div>
                     </div>
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Decorative corner accents */}

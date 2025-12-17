@@ -1,11 +1,12 @@
 'use client';
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "../../components/Navbar";
 import Sidebar from "../../components/Sidebar";
 import AddStationForm from "../../components/AddStationForm";
 import dynamic from "next/dynamic";
 import { useStationStatus } from "../../hooks/useStationStatus";
+import { useStations } from "../../hooks/useStations";
 import { ArrowLeft, Thermometer, Battery, BatteryCharging, Zap, Sun, Gauge, Droplets, Wind, Compass, Ruler, TrendingUp, Waves, ScanLine } from "lucide-react";
 import {
   FaTemperatureHigh,
@@ -45,19 +46,35 @@ export default function Dashboard() {
 
   // AWS (existing) & EWS (new) live states
   const [weatherData, setWeatherData] = useState([]); // AWS live
-  // changed to hold multiple EWS stations
-  const [ewsLatest, setEwsLatest] = useState({ Vasudhara: null, Mana: null });
+  // changed to hold multiple EWS stations - now dynamic
+  const [ewsLatest, setEwsLatest] = useState({});
   const [isDarkTheme, setIsDarkTheme] = useState(false);
   
   // Station status hook for manual status management
   const { getStationStatus } = useStationStatus();
+  
+  // Fetch dynamic stations
+  const { stations, awsStations, ewsStations, loading: stationsLoading } = useStations();
 
-  // DEVICE + STATION ID mapping
-  const DEVICE_MAP = {
-    Barrage: { device: 31928, sid: "ST015" }, // Lambagad -> Barrage
-    Mana: { device: 32929, sid: "ST019" },
-    Vasudhara: { device: 32930, sid: "ST020" },
-  };
+  // Build DEVICE + STATION ID mapping dynamically from fetched stations
+  const DEVICE_MAP = React.useMemo(() => {
+    const map = {};
+    stations.forEach(station => {
+      // Use station_name as key (matching backend API response keys)
+      // Backend may return "Lambagad" for Barrage, so we need to handle both
+      const name = station.station_name;
+      map[name] = {
+        device: parseInt(station.DeviceID) || null,
+        sid: station.StationID
+      };
+      // Also map common aliases
+      if (name === "Lambagad" || name === "Barrage") {
+        map["Barrage"] = { device: parseInt(station.DeviceID) || null, sid: station.StationID };
+        map["Lambagad"] = { device: parseInt(station.DeviceID) || null, sid: station.StationID };
+      }
+    });
+    return map;
+  }, [stations]);
 
   // redirect if not logged in
   useEffect(() => {
@@ -90,6 +107,12 @@ export default function Dashboard() {
   // ---------- AWS (existing) ----------
   const fetchLiveAWSData = async () => {
     try {
+      // Don't fetch if stations are still loading or no stations available
+      if (stationsLoading || awsStations.length === 0) {
+        setWeatherData([]);
+        return;
+      }
+
       const res = await fetch("https://hydrology-jpvl.onrender.com/api/aws-live/all");
       const json = await res.json();
       if (!json?.data) {
@@ -130,13 +153,64 @@ export default function Dashboard() {
       const dataObj = json.data;
       const formatted = [];
 
-      const lambagad = normalize("Barrage", dataObj.Lambagad);
-      const mana = normalize("Mana", dataObj.Mana);
-      const vasudharaAWS = normalize("Vasudhara", dataObj.Vasudhara);
-
-      if (lambagad) formatted.push(lambagad);
-      if (mana) formatted.push(mana);
-      if (vasudharaAWS) formatted.push(vasudharaAWS);
+      // Process all AWS stations dynamically
+      awsStations.forEach(station => {
+        const stationName = station.station_name;
+        // Backend API returns keys like "Lambagad", "Mana", "Vasudhara"
+        // But database might have "Barrage" instead of "Lambagad"
+        // Try multiple name variations
+        let data = dataObj[stationName];
+        if (!data) {
+          // Try without spaces
+          data = dataObj[stationName.replace(/\s+/g, '')];
+        }
+        if (!data) {
+          // Handle Barrage/Lambagad mapping
+          if (stationName === "Barrage" || stationName === "Lambagad") {
+            data = dataObj["Lambagad"] || dataObj["Barrage"];
+          }
+        }
+        if (!data) {
+          // Try case-insensitive match
+          const keys = Object.keys(dataObj);
+          const matchedKey = keys.find(k => k.toLowerCase() === stationName.toLowerCase());
+          if (matchedKey) data = dataObj[matchedKey];
+        }
+        
+        // Always add station, even if no data (will show as offline)
+        if (data) {
+          // Use the actual API key name for normalization (might be "Lambagad" even if DB has "Barrage")
+          const apiKeyName = Object.keys(dataObj).find(k => dataObj[k] === data) || stationName;
+          const normalized = normalize(apiKeyName, data);
+          if (normalized) {
+            // Override station name with the one from database for display
+            normalized.station = stationName;
+            normalized.selectedFields = station.selected_fields || [];
+            formatted.push(normalized);
+          }
+        } else {
+          // Add station with null data (will show as offline)
+          const normalized = {
+            station: stationName,
+            device: DEVICE_MAP[stationName]?.device ?? null,
+            stationID: DEVICE_MAP[stationName]?.sid ?? null,
+            temperature: null,
+            windSpeed: null,
+            windDirection: null,
+            pressure: null,
+            humidity: null,
+            rain: null,
+            precipitation: null,
+            bucketWeight: null,
+            PIR: null,
+            avgPIR: null,
+            timestamp: null,
+            raw: null,
+            selectedFields: station.selected_fields || [],
+          };
+          formatted.push(normalized);
+        }
+      });
 
       setWeatherData(formatted);
       setLastUpdated(new Date().toLocaleString());
@@ -148,132 +222,157 @@ export default function Dashboard() {
   // ---------- EWS (NEW) ----------
   const fetchLiveEWSData = async () => {
     try {
+      // Don't fetch if stations are still loading or no stations available
+      if (stationsLoading || ewsStations.length === 0) {
+        setEwsLatest({});
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       const res = await fetch("https://hydrology-jpvl.onrender.com/api/ews-live/all");
       const json = await res.json();
-      // Prepare defaults
-      let vasudharaNorm = null;
-      let manaNorm = null;
+      // Prepare dynamic object for all EWS stations
+      const ewsData = {};
 
-      // Vasudhara
-      if (json?.data?.Vasudhara && Array.isArray(json.data.Vasudhara) && json.data.Vasudhara.length) {
-        const arr = json.data.Vasudhara;
+      // Process all EWS stations dynamically - ensure ALL stations appear
+      ewsStations.forEach(station => {
+        const stationName = station.station_name;
+        // Backend API returns keys like "Mana", "Vasudhara"
+        // Try multiple name variations
+        let stationData = json?.data?.[stationName];
+        if (!stationData) {
+          // Try without spaces
+          stationData = json?.data?.[stationName.replace(/\s+/g, '')];
+        }
+        if (!stationData) {
+          // Try case-insensitive match
+          const keys = Object.keys(json?.data || {});
+          const matchedKey = keys.find(k => k.toLowerCase() === stationName.toLowerCase());
+          if (matchedKey) stationData = json?.data?.[matchedKey];
+        }
         
-        // Ensure arr[0] is truly the latest by checking timestamps
-        const latestRecord = arr.reduce((latest, current) => {
-          const latestTime = new Date(latest.timestamp || 0).getTime();
-          const currentTime = new Date(current.timestamp || 0).getTime();
-          return currentTime > latestTime ? current : latest;
-        }, arr[0]);
-        
-        const candidate = arr.find((r) =>
-          [r.water_level, r.avg_surface_velocity, r.surface_velocity, r.water_dist_sensor, r.water_discharge, r.tilt_angle, r.flow_direction]
-            .some((x) => x !== null && x !== undefined && x !== "")
-        ) || latestRecord;
-
-        // Use candidate timestamp (same record as data), fallback to latestRecord if missing
-        vasudharaNorm = {
-          StationID: candidate.StationID ?? null,
-          DeviceID: candidate.DeviceID ?? null,
-          surface_velocity: safeParse(candidate.surface_velocity),
-          avg_surface_velocity: safeParse(candidate.avg_surface_velocity),
-          water_dist_sensor: safeParse(candidate.water_dist_sensor),
-          water_level: safeParse(candidate.water_level),
-          water_discharge: safeParse(candidate.water_discharge),
-          tilt_angle: safeParse(candidate.tilt_angle),
-          flow_direction: safeParse(candidate.flow_direction),
-          internal_temperature: safeParse(candidate.internal_temperature),
-          charge_current: safeParse(candidate.charge_current),
-          absorbed_current: safeParse(candidate.observed_current),
-          battery_voltage: safeParse(candidate.battery_voltage),
-          solar_panel_tracking: safeParse(candidate.solar_panel_tracking),
-          timestamp: candidate.timestamp ?? latestRecord.timestamp,
-          UID: candidate.UID ?? null,
-          raw: candidate,
-        };
-      }
-
-      // Mana (new)
-      if (json?.data?.Mana && Array.isArray(json.data.Mana) && json.data.Mana.length) {
-        const arrM = json.data.Mana;
-        
-        // Ensure we get the absolute latest record by checking all timestamps
-        const latestRecordM = arrM.reduce((latest, current) => {
-          const latestTime = new Date(latest.timestamp || 0).getTime();
-          const currentTime = new Date(current.timestamp || 0).getTime();
-          return currentTime > latestTime ? current : latest;
-        }, arrM[0]);
-        
-        const candidateM = arrM.find((r) =>
-          [r.water_level, r.avg_surface_velocity, r.surface_velocity, r.water_dist_sensor, r.water_discharge, r.tilt_angle, r.flow_direction]
-            .some((x) => x !== null && x !== undefined && x !== "")
-        ) || latestRecordM;
-
-        // Fix Mana timestamp ONLY (MySQL → ISO)
-        const fixManaTimestamp = (ts) => {
-          if (!ts) return null;
-          if (ts.includes(" ") && !ts.includes("T")) {
-            return ts.replace(" ", "T") + "Z"; // convert to ISO
+        // Always create an entry for this station, even if no data
+        if (stationData && Array.isArray(stationData) && stationData.length) {
+          const arr = stationData;
+          
+          // Ensure arr[0] is truly the latest by checking timestamps
+          const latestRecord = arr.reduce((latest, current) => {
+            const latestTime = new Date(latest.timestamp || 0).getTime();
+            const currentTime = new Date(current.timestamp || 0).getTime();
+            return currentTime > latestTime ? current : latest;
+          }, arr[0]);
+          
+          // Find candidate with valid data - use selectedFields from station config
+          const selectedFields = station.selected_fields || [];
+          let candidate = latestRecord;
+          if (selectedFields.length > 0) {
+            // Check if any selected field has valid data
+            candidate = arr.find((r) =>
+              selectedFields.some(field => {
+                const value = r[field];
+                return value !== null && value !== undefined && value !== "";
+              })
+            ) || latestRecord;
+          } else {
+            // Fallback to checking common fields if no selectedFields
+            candidate = arr.find((r) =>
+              [r.water_level, r.avg_surface_velocity, r.surface_velocity, r.water_dist_sensor, r.water_discharge, r.tilt_angle, r.flow_direction]
+                .some((x) => x !== null && x !== undefined && x !== "")
+            ) || latestRecord;
           }
-          return ts;
-        };
 
-        // Use candidateM timestamp (same record as data), fallback to latestRecordM if missing
-        manaNorm = {
-          StationID: candidateM.StationID ?? null,
-          DeviceID: candidateM.DeviceID ?? null,
-          surface_velocity: safeParse(candidateM.surface_velocity),
-          avg_surface_velocity: safeParse(candidateM.avg_surface_velocity),
-          water_dist_sensor: safeParse(candidateM.water_dist_sensor),
-          water_level: safeParse(candidateM.water_level),
-          water_discharge: safeParse(candidateM.water_discharge),
-          tilt_angle: safeParse(candidateM.tilt_angle),
-          flow_direction: safeParse(candidateM.flow_direction),
-          SNR: safeParse(candidateM.SNR),
-          timestamp: fixManaTimestamp(candidateM.timestamp) ?? fixManaTimestamp(latestRecordM.timestamp),
-          UID: candidateM.UID ?? null,
-          raw: candidateM,
-        };
-      } else {
-        // If no data, create empty data object with null timestamp to show card as Offline
-        manaNorm = {
-          StationID: null,
-          DeviceID: null,
-          surface_velocity: null,
-          avg_surface_velocity: null,
-          water_dist_sensor: null,
-          water_level: null,
-          water_discharge: null,
-          tilt_angle: null,
-          flow_direction: null,
-          SNR: null,
-          timestamp: null, // This will show as Offline
-          UID: null,
-          raw: null,
-        };
-      }
+          // Fix timestamp (MySQL → ISO) for some stations
+          const fixTimestamp = (ts) => {
+            if (!ts) return null;
+            if (ts.includes(" ") && !ts.includes("T")) {
+              return ts.replace(" ", "T") + "Z"; // convert to ISO
+            }
+            return ts;
+          };
 
-      setEwsLatest({ Vasudhara: vasudharaNorm, Mana: manaNorm });
+          ewsData[stationName] = {
+            StationID: candidate.StationID ?? null,
+            DeviceID: candidate.DeviceID ?? null,
+            surface_velocity: safeParse(candidate.surface_velocity),
+            avg_surface_velocity: safeParse(candidate.avg_surface_velocity),
+            water_dist_sensor: safeParse(candidate.water_dist_sensor),
+            water_level: safeParse(candidate.water_level),
+            water_discharge: safeParse(candidate.water_discharge),
+            tilt_angle: safeParse(candidate.tilt_angle),
+            flow_direction: safeParse(candidate.flow_direction),
+            SNR: safeParse(candidate.SNR),
+            internal_temperature: safeParse(candidate.internal_temperature),
+            charge_current: safeParse(candidate.charge_current),
+            absorbed_current: safeParse(candidate.observed_current ?? candidate.absorbed_current),
+            battery_voltage: safeParse(candidate.battery_voltage),
+            solar_panel_tracking: safeParse(candidate.solar_panel_tracking),
+            timestamp: fixTimestamp(candidate.timestamp) ?? fixTimestamp(latestRecord.timestamp),
+            UID: candidate.UID ?? null,
+            raw: candidate,
+          };
+        } else {
+          // If no data, create empty data object with null timestamp to show card as Offline
+          ewsData[stationName] = {
+            StationID: station.StationID ?? null,
+            DeviceID: station.DeviceID ?? null,
+            surface_velocity: null,
+            avg_surface_velocity: null,
+            water_dist_sensor: null,
+            water_level: null,
+            water_discharge: null,
+            tilt_angle: null,
+            flow_direction: null,
+            SNR: null,
+            internal_temperature: null,
+            charge_current: null,
+            absorbed_current: null,
+            battery_voltage: null,
+            solar_panel_tracking: null,
+            timestamp: null,
+            UID: null,
+            raw: null,
+          };
+        }
+      });
+
+      setEwsLatest(ewsData);
       setLastUpdated(new Date().toLocaleString());
     } catch (e) {
       console.error("EWS fetch failed", e);
-      setEwsLatest({ Vasudhara: null, Mana: null });
+      setEwsLatest({});
     } finally {
       setIsLoading(false);
     }
   };
 
-  // initial + interval
+  // initial + interval - wait for stations to load
   useEffect(() => {
+    // Wait for stations to finish loading
+    if (stationsLoading) {
+      return;
+    }
+    
+    // Don't fetch if no stations available
+    if (awsStations.length === 0 && ewsStations.length === 0) {
+      setWeatherData([]);
+      setEwsLatest({});
+      setIsLoading(false);
+      return;
+    }
+    
+    // Initial fetch
     fetchLiveEWSData();
     fetchLiveAWSData();
+    
+    // Set up interval
     const id = setInterval(() => {
       fetchLiveEWSData();
       fetchLiveAWSData();
     }, 10_000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [stationsLoading, awsStations.length, ewsStations.length]);
 
   const parseUTC = (ts) => {
     if (!ts) return null;
@@ -444,6 +543,7 @@ export default function Dashboard() {
               BarrageBadge={BarrageBadge}
               timestampLine={timestampLine}
               getStationStatus={getStationStatus}
+              ewsStations={ewsStations}
             />
           </div>
 
@@ -469,6 +569,7 @@ export default function Dashboard() {
               isDarkTheme={isDarkTheme}
               timestampLine={timestampLine}
               getStationStatus={getStationStatus}
+              awsStations={awsStations}
             />
           </div>
         </div>
@@ -488,7 +589,7 @@ export default function Dashboard() {
 /* ---------------------------
    BarrageMonitoring (Vasudhara + Mana cards)
 --------------------------- */
-function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge, timestampLine, getStationStatus }) {
+function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge, timestampLine, getStationStatus, ewsStations }) {
   const formatValue = (v, digits = 2, isMaintenance = false) => {
     if (isMaintenance) return "NIL";
     if (v === null || v === undefined || v === "") return "-";
@@ -498,11 +599,16 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
     return String(v);
   };
   
-  // Station ID mapping for EWS
-  const STATION_ID_MAP = {
-    Vasudhara: "ST020",
-    Mana: "ST019",
-  };
+  // Build Station ID mapping dynamically from ewsStations
+  const STATION_ID_MAP = React.useMemo(() => {
+    const map = {};
+    if (ewsStations) {
+      ewsStations.forEach(station => {
+        map[station.station_name] = station.StationID;
+      });
+    }
+    return map;
+  }, [ewsStations]);
 
   // flow direction rules
   const displayFlowDirection = (val) => {
@@ -512,23 +618,47 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
     return Number.isFinite(n) ? `${n}°` : "-";
   };
 
-  // count actives across both stations
-  const activeCount = ["Vasudhara", "Mana"].reduce((acc, key) => {
-    const rec = ewsLatest?.[key];
-    if (rec && rec.timestamp) {
-      const parsed = Date.parse(rec.timestamp);
-      if (!isNaN(parsed)) {
-        const diffMin = (Date.now() - parsed) / (1000 * 60);
-        if (diffMin <= 20) acc += 1;
-      }
+  // Build stations list dynamically from ewsStations
+  // Order: Vasudhara first, then Mana, then others
+  const stationsToShow = React.useMemo(() => {
+    if (!ewsStations || ewsStations.length === 0) {
+      return [
+        { key: "Vasudhara", label: "Vasudhara", stationId: "ST020" },
+        { key: "Mana", label: "Mana", stationId: "ST019" },
+      ];
     }
-    return acc;
-  }, 0);
+    // Sort: Vasudhara first, then Mana, then others alphabetically
+    const sorted = [...ewsStations].sort((a, b) => {
+      const nameA = a.station_name.toLowerCase();
+      const nameB = b.station_name.toLowerCase();
+      if (nameA === "vasudhara") return -1;
+      if (nameB === "vasudhara") return 1;
+      if (nameA === "mana") return -1;
+      if (nameB === "mana") return 1;
+      return nameA.localeCompare(nameB);
+    });
+    return sorted.map(station => ({
+      key: station.station_name,
+      label: station.station_name,
+      stationId: station.StationID,
+      selectedFields: station.selected_fields || []
+    }));
+  }, [ewsStations]);
 
-  const stationsToShow = [
-    { key: "Vasudhara", label: "Vasudhara" },
-    { key: "Mana", label: "Mana" },
-  ];
+  // count actives across all EWS stations dynamically
+  const activeCount = React.useMemo(() => {
+    return stationsToShow.reduce((acc, st) => {
+      const rec = ewsLatest?.[st.key];
+      if (rec && rec.timestamp) {
+        const parsed = Date.parse(rec.timestamp);
+        if (!isNaN(parsed)) {
+          const diffMin = (Date.now() - parsed) / (1000 * 60);
+          if (diffMin <= 20) acc += 1;
+        }
+      }
+      return acc;
+    }, 0);
+  }, [stationsToShow, ewsLatest]);
 
   return (
     <motion.div
@@ -567,7 +697,8 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
       <div className="space-y-4">
         {stationsToShow.map((st) => {
           const data = ewsLatest?.[st.key];
-          const stationId = STATION_ID_MAP[st.key];
+          const stationId = st.stationId;
+          const selectedFields = st.selectedFields || [];
           const statusInfo = getStationStatus(stationId, "EWS", data?.timestamp, 20);
           const isMaintenance = statusInfo.status === "maintenance";
           const displayTimestamp = statusInfo.status === "offline" && statusInfo.offlineTimestamp 
@@ -614,133 +745,155 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
                     </div>
                   </div>
 
-                  {/* SURFACE / FLOW SECTION */}
-                  <div
-                    className={`p-3 rounded-xl border mb-3 ${
-                      isDarkTheme
-                        ? "bg-[#0f2a59]/70 border-[#1f4fa8]/30 text-slate-100"
-                        : "bg-white border-gray-100"
-                    }`}
-                  >
-                    <p className={`text-xs mb-2 ${isDarkTheme ? "text-amber-200" : "text-amber-600"}`}>
-                      Surface / Flow
-                    </p>
+                  {/* SURFACE / FLOW SECTION - only show if at least one field is selected */}
+                  {(selectedFields.includes('surface_velocity') || selectedFields.includes('avg_surface_velocity') || 
+                    selectedFields.includes('SNR') || selectedFields.includes('water_discharge')) && (
+                    <div
+                      className={`p-3 rounded-xl border mb-3 ${
+                        isDarkTheme
+                          ? "bg-[#0f2a59]/70 border-[#1f4fa8]/30 text-slate-100"
+                          : "bg-white border-gray-100"
+                      }`}
+                    >
+                      <p className={`text-xs mb-2 ${isDarkTheme ? "text-amber-200" : "text-amber-600"}`}>
+                        Surface / Flow
+                      </p>
 
-                    <div className="flex justify-between items-center space-x-4">
-                      {/* Surface Velocity */}
-                      <div className="flex-1">
-                        <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                          <Waves className="w-5 h-5 text-blue-400" />
-                          Surface Velocity
-                        </p>
-                        <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                          {formatValue(data.surface_velocity, 2, isMaintenance)} {isMaintenance ? "" : "m/s"}
-                        </p>
-                      </div>
+                      <div className="flex justify-between items-center space-x-4">
+                        {/* Surface Velocity - only if selected */}
+                        {selectedFields.includes('surface_velocity') && (
+                          <div className="flex-1">
+                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                              <Waves className="w-5 h-5 text-blue-400" />
+                              Surface Velocity
+                            </p>
+                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                              {formatValue(data.surface_velocity, 2, isMaintenance)} {isMaintenance ? "" : "m/s"}
+                            </p>
+                          </div>
+                        )}
 
-                      {/* Avg Velocity */}
-                      <div className="flex-1">
-                        <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                          <Waves className="w-5 h-5 text-cyan-400" />
-                          Avg Velocity
-                        </p>
-                        <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                          {formatValue(data.avg_surface_velocity, 2, isMaintenance)} {isMaintenance ? "" : "m/s"}
-                        </p>
-                      </div>
+                        {/* Avg Velocity - only if selected */}
+                        {selectedFields.includes('avg_surface_velocity') && (
+                          <div className="flex-1">
+                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                              <Waves className="w-5 h-5 text-cyan-400" />
+                              Avg Velocity
+                            </p>
+                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                              {formatValue(data.avg_surface_velocity, 2, isMaintenance)} {isMaintenance ? "" : "m/s"}
+                            </p>
+                          </div>
+                        )}
 
-                      {/* SNR (only for Mana) */}
-                      {st.key === "Mana" && (
-                        <div className="flex-1">
-                          <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                            <TrendingUp className="w-5 h-5 text-purple-400" />
-                            SNR
-                          </p>
-                          <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                            {formatValue(data.SNR, 2, isMaintenance)} {isMaintenance ? "" : "dB"}
-                          </p>
-                        </div>
-                      )}
+                        {/* SNR - only if selected */}
+                        {selectedFields.includes('SNR') && (
+                          <div className="flex-1">
+                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                              <TrendingUp className="w-5 h-5 text-purple-400" />
+                              SNR
+                            </p>
+                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                              {formatValue(data.SNR, 2, isMaintenance)} {isMaintenance ? "" : "dB"}
+                            </p>
+                          </div>
+                        )}
 
-                      {/* Discharge */}
-                      <div className="flex-1">
-                        <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                          <Gauge className="w-5 h-5 text-green-400" />
-                          Discharge
-                        </p>
-                        <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                          {isMaintenance 
-                            ? "NIL"
-                            : data.water_discharge === null
-                            ? "-"
-                            : `${formatValue(data.water_discharge, 2)} m³/s`}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* WATER LEVEL / DISTANCE */}
-                  <div
-                    className={`p-3 rounded-xl border ${
-                      isDarkTheme
-                        ? "bg-[#0f2a59]/60 border-[#1f4fa8]/30 text-slate-100"
-                        : "bg-white border-gray-100"
-                    }`}
-                  >
-                    <p className={`text-xs mb-2 ${isDarkTheme ? "text-amber-200" : "text-amber-600"}`}>
-                      Water Level / Distance
-                    </p>
-
-                    <div className="flex justify-between items-center">
-
-                      {/* Water Level */}
-                      <div>
-                        <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                          <Droplets className="w-5 h-5 text-blue-500" />
-                          Water Level
-                        </p>
-                        <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                          {formatValue(data.water_level, 2, isMaintenance)} {isMaintenance ? "" : "m"}
-                        </p>
-                      </div>
-
-                      {/* Distance Sensor */}
-                      <div>
-                        <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                          <ScanLine className="w-5 h-5 text-purple-400" />
-                          Distance from Sensor
-                        </p>
-                        <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                          {formatValue(data.water_dist_sensor, 2, isMaintenance)} {isMaintenance ? "" : "m"}
-                        </p>
-                      </div>
-
-                      {/* Tilt */}
-                      <div>
-                        <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                          <TrendingUp className="w-5 h-5 text-orange-400" />
-                          Tilt
-                        </p>
-                        <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                          {formatValue(data.tilt_angle, 1, isMaintenance)} {isMaintenance ? "" : "°"}
-                        </p>
-                      </div>
-
-                      {/* Flow Direction */}
-                      <div>
-                        <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                          <Compass className="w-5 h-5 text-amber-400" />
-                          Flow Dir
-                        </p>
-                        <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                          {isMaintenance ? "NIL" : displayFlowDirection(data.flow_direction)}
-                        </p>
+                        {/* Discharge - only if selected */}
+                        {selectedFields.includes('water_discharge') && (
+                          <div className="flex-1">
+                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                              <Gauge className="w-5 h-5 text-green-400" />
+                              Discharge
+                            </p>
+                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                              {isMaintenance 
+                                ? "NIL"
+                                : data.water_discharge === null
+                                ? "-"
+                                : `${formatValue(data.water_discharge, 2)} m³/s`}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
+                  )}
 
-                  {/* NEW PARAMETERS SECTION - Only for Vasudhara */}
-                  {st.key === "Vasudhara" && (
+                  {/* WATER LEVEL / DISTANCE - only show if at least one field is selected */}
+                  {(selectedFields.includes('water_level') || selectedFields.includes('water_dist_sensor') || 
+                    selectedFields.includes('tilt_angle') || selectedFields.includes('flow_direction')) && (
+                    <div
+                      className={`p-3 rounded-xl border ${
+                        isDarkTheme
+                          ? "bg-[#0f2a59]/60 border-[#1f4fa8]/30 text-slate-100"
+                          : "bg-white border-gray-100"
+                      }`}
+                    >
+                      <p className={`text-xs mb-2 ${isDarkTheme ? "text-amber-200" : "text-amber-600"}`}>
+                        Water Level / Distance
+                      </p>
+
+                      <div className="flex justify-between items-center">
+
+                        {/* Water Level - only if selected */}
+                        {selectedFields.includes('water_level') && (
+                          <div>
+                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                              <Droplets className="w-5 h-5 text-blue-500" />
+                              Water Level
+                            </p>
+                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                              {formatValue(data.water_level, 2, isMaintenance)} {isMaintenance ? "" : "m"}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Distance Sensor - only if selected */}
+                        {selectedFields.includes('water_dist_sensor') && (
+                          <div>
+                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                              <ScanLine className="w-5 h-5 text-purple-400" />
+                              Distance from Sensor
+                            </p>
+                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                              {formatValue(data.water_dist_sensor, 2, isMaintenance)} {isMaintenance ? "" : "m"}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Tilt - only if selected */}
+                        {selectedFields.includes('tilt_angle') && (
+                          <div>
+                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                              <TrendingUp className="w-5 h-5 text-orange-400" />
+                              Tilt
+                            </p>
+                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                              {formatValue(data.tilt_angle, 1, isMaintenance)} {isMaintenance ? "" : "°"}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Flow Direction - only if selected */}
+                        {selectedFields.includes('flow_direction') && (
+                          <div>
+                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                              <Compass className="w-5 h-5 text-amber-400" />
+                              Flow Dir
+                            </p>
+                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                              {isMaintenance ? "NIL" : displayFlowDirection(data.flow_direction)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* POWER SECTION - only show if at least one power field is selected */}
+                  {(selectedFields.includes('internal_temperature') || selectedFields.includes('charge_current') || 
+                    selectedFields.includes('observed_current') || selectedFields.includes('battery_voltage') || 
+                    selectedFields.includes('solar_panel_tracking')) && (
                     <div
                       className={`p-3 rounded-xl border mt-3 ${
                         isDarkTheme
@@ -753,60 +906,70 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
                       </p>
 
                       <div className="grid grid-cols-2 gap-3">
-                        {/* Internal Temperature */}
-                        <div>
-                          <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                            <Thermometer className="w-5 h-5 text-red-400" />
-                            Internal Temperature
-                          </p>
-                          <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                            {formatValue(data.internal_temperature, 1, isMaintenance)} {isMaintenance ? "" : "°C"}
-                          </p>
-                        </div>
+                        {/* Internal Temperature - only if selected */}
+                        {selectedFields.includes('internal_temperature') && (
+                          <div>
+                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                              <Thermometer className="w-5 h-5 text-red-400" />
+                              Internal Temperature
+                            </p>
+                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                              {formatValue(data.internal_temperature, 1, isMaintenance)} {isMaintenance ? "" : "°C"}
+                            </p>
+                          </div>
+                        )}
 
-                        {/* Charge Current */}
-                        <div>
-                          <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                            <BatteryCharging className="w-5 h-5 text-green-400" />
-                            Charge Current
-                          </p>
-                          <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                            {formatValue(data.charge_current, 4, isMaintenance)} {isMaintenance ? "" : "A"}
-                          </p>
-                        </div>
+                        {/* Charge Current - only if selected */}
+                        {selectedFields.includes('charge_current') && (
+                          <div>
+                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                              <BatteryCharging className="w-5 h-5 text-green-400" />
+                              Charge Current
+                            </p>
+                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                              {formatValue(data.charge_current, 4, isMaintenance)} {isMaintenance ? "" : "A"}
+                            </p>
+                          </div>
+                        )}
 
-                        {/* Absorbed Current */}
-                        <div>
-                          <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                            <Zap className="w-5 h-5 text-yellow-400" />
-                            Absorbed Current
-                          </p>
-                          <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                            {formatValue(data.absorbed_current, 4, isMaintenance)} {isMaintenance ? "" : "A"}
-                          </p>
-                        </div>
+                        {/* Absorbed Current - only if selected */}
+                        {selectedFields.includes('observed_current') && (
+                          <div>
+                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                              <Zap className="w-5 h-5 text-yellow-400" />
+                              Absorbed Current
+                            </p>
+                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                              {formatValue(data.absorbed_current, 4, isMaintenance)} {isMaintenance ? "" : "A"}
+                            </p>
+                          </div>
+                        )}
 
-                        {/* Battery Voltage */}
-                        <div>
-                          <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                            <Battery className="w-5 h-5 text-blue-400" />
-                            Battery Voltage
-                          </p>
-                          <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                            {formatValue(data.battery_voltage, 1, isMaintenance)} {isMaintenance ? "" : "V"}
-                          </p>
-                        </div>
+                        {/* Battery Voltage - only if selected */}
+                        {selectedFields.includes('battery_voltage') && (
+                          <div>
+                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                              <Battery className="w-5 h-5 text-blue-400" />
+                              Battery Voltage
+                            </p>
+                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                              {formatValue(data.battery_voltage, 1, isMaintenance)} {isMaintenance ? "" : "V"}
+                            </p>
+                          </div>
+                        )}
 
-                        {/* Solar Panel Tracking */}
-                        <div className="col-span-2">
-                          <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                            <Sun className="w-5 h-5 text-orange-400" />
-                            Solar Panel Tracking
-                          </p>
-                          <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                            {formatValue(data.solar_panel_tracking, 1)} V
-                          </p>
-                        </div>
+                        {/* Solar Panel Tracking - only if selected */}
+                        {selectedFields.includes('solar_panel_tracking') && (
+                          <div className="col-span-2">
+                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                              <Sun className="w-5 h-5 text-orange-400" />
+                              Solar Panel Tracking
+                            </p>
+                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                              {formatValue(data.solar_panel_tracking, 1)} V
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -824,51 +987,88 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
 /* ---------------------------
    WeatherStationsSection (updated timestamps, removed stationID & device)
    --------------------------- */
-function WeatherStationsSection({ weatherData, StationBadge, isDarkTheme, timestampLine, getStationStatus }) {
+function WeatherStationsSection({ weatherData, StationBadge, isDarkTheme, timestampLine, getStationStatus, awsStations }) {
   const formatValue = (value, suffix = "", isMaintenance = false) => {
     if (isMaintenance) return "NIL";
     return value === null || value === undefined || value === "" ? "-" : `${value} ${suffix}`.trim();
   };
   
-  // Station ID mapping for AWS
-  const STATION_ID_MAP = {
-    "Barrage": "ST015",
-    "Mana": "ST019",
-    "Vasudhara": "ST020",
+  // Build Station ID mapping dynamically from awsStations
+  const STATION_ID_MAP = React.useMemo(() => {
+    const map = {};
+    if (awsStations) {
+      awsStations.forEach(station => {
+        map[station.station_name] = station.StationID;
+        // Handle Barrage/Lambagad aliases
+        if (station.station_name === "Barrage" || station.station_name === "Lambagad") {
+          map["Barrage"] = station.StationID;
+          map["Lambagad"] = station.StationID;
+        }
+      });
+    }
+    return map;
+  }, [awsStations]);
+
+  // Field mapping: database field name -> display key in weatherData
+  const fieldToKeyMap = {
+    'temperature': 'temperature',
+    'pressure': 'pressure',
+    'relative_humidity': 'humidity',
+    'windspeed': 'windSpeed',
+    'winddirection': 'windDirection',
+    'rain': 'rain',
+    'precipitation': 'precipitation',
+    'bucket_weight': 'bucketWeight',
+    'PIR': 'PIR',
+    'avg_PIR': 'avgPIR',
   };
 
-  const metricSections = [
+  // All available metric sections
+  const allMetricSections = [
     {
       title: "Atmospheric",
       metrics: [
-        { key: "temperature", label: "Temperature", suffix: "°C", icon: <FaTemperatureHigh className="text-red-500" /> },
-        { key: "pressure", label: "Pressure", suffix: "hPa", icon: <FaTachometerAlt className="text-purple-500" /> },
-        { key: "humidity", label: "Humidity", suffix: "%", icon: <FaTint className="text-cyan-500" /> },
+        { key: "temperature", label: "Temperature", suffix: "°C", icon: <FaTemperatureHigh className="text-red-500" />, dbField: "temperature" },
+        { key: "pressure", label: "Pressure", suffix: "hPa", icon: <FaTachometerAlt className="text-purple-500" />, dbField: "pressure" },
+        { key: "humidity", label: "Humidity", suffix: "%", icon: <FaTint className="text-cyan-500" />, dbField: "relative_humidity" },
       ],
     },
     {
       title: "Wind",
       metrics: [
-        { key: "windSpeed", label: "Speed", suffix: "m/s", icon: <FaWind className="text-blue-500" /> },
-        { key: "windDirection", label: "Direction", suffix: "°", icon: <FaCloudSun className="text-amber-500" /> },
+        { key: "windSpeed", label: "Speed", suffix: "m/s", icon: <FaWind className="text-blue-500" />, dbField: "windspeed" },
+        { key: "windDirection", label: "Direction", suffix: "°", icon: <FaCloudSun className="text-amber-500" />, dbField: "winddirection" },
       ],
     },
     {
       title: "Solar",
       metrics: [
-        { key: "PIR", label: "Radiation", suffix: "W/m²", icon: <FaSun className="text-yellow-500" /> },
-        { key: "avgPIR", label: "Avg Radiation", suffix: "W/m²", icon: <FaSun className="text-yellow-600" /> },
+        { key: "PIR", label: "Radiation", suffix: "W/m²", icon: <FaSun className="text-yellow-500" />, dbField: "PIR" },
+        { key: "avgPIR", label: "Avg Radiation", suffix: "W/m²", icon: <FaSun className="text-yellow-600" />, dbField: "avg_PIR" },
       ],
     },
     {
       title: "Precipitation",
       metrics: [
-        { key: "rain", label: "Rain", suffix: "mm", icon: <FaCloudRain className="text-blue-400" /> },
-        { key: "precipitation", label: "Snow", suffix: "mm", icon: <FaCloudRain className="text-indigo-400" /> },
-        { key: "bucketWeight", label: "Bucket Weight", suffix: "gm", icon: <FaWeightHanging className="text-gray-600" /> },
+        { key: "rain", label: "Rain", suffix: "mm", icon: <FaCloudRain className="text-blue-400" />, dbField: "rain" },
+        { key: "precipitation", label: "Snow", suffix: "mm", icon: <FaCloudRain className="text-indigo-400" />, dbField: "precipitation" },
+        { key: "bucketWeight", label: "Bucket Weight", suffix: "gm", icon: <FaWeightHanging className="text-gray-600" />, dbField: "bucket_weight" },
       ],
     },
   ];
+
+  // Filter metric sections based on selected fields for a station
+  const getFilteredMetricSections = (selectedFields) => {
+    if (!selectedFields || selectedFields.length === 0) {
+      // If no selected fields, show all (backward compatibility)
+      return allMetricSections;
+    }
+    
+    return allMetricSections.map(section => ({
+      ...section,
+      metrics: section.metrics.filter(metric => selectedFields.includes(metric.dbField))
+    })).filter(section => section.metrics.length > 0); // Remove empty sections
+  };
 
   // flow direction display utility reused here
   const displayFlowDirection = (val) => {
@@ -921,6 +1121,10 @@ function WeatherStationsSection({ weatherData, StationBadge, isDarkTheme, timest
               ? timestampLine(statusInfo.offlineTimestamp) 
               : timestampLine(station.timestamp);
             
+            // Get filtered metric sections based on selected fields
+            const selectedFields = station.selectedFields || [];
+            const filteredMetricSections = getFilteredMetricSections(selectedFields);
+            
             return (
             <div
               key={station.station}
@@ -958,7 +1162,7 @@ function WeatherStationsSection({ weatherData, StationBadge, isDarkTheme, timest
               </div>
 
               <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                {metricSections.map((section) => (
+                {filteredMetricSections.map((section) => (
                   <div
                     key={`${station.station}-${section.title}`}
                     className={`rounded-xl p-2 border ${

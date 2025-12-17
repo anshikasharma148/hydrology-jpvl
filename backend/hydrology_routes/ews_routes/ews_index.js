@@ -36,31 +36,37 @@ router.use("/mana", manaRoutes);
 const { hydrologyDB: db } = require("../../db.js");
 
 // --------------------
-// GET ALL STATIONS
+// GET ALL STATIONS (DYNAMIC)
 // --------------------
 router.get("/all", async (req, res) => {
   try {
-    const [vasudhara] = await db.query(`
-      SELECT *
-      FROM EWS_retrieved_db_data
-      WHERE StationID = 'ST020'
-      ORDER BY timestamp DESC
+    // Fetch all active EWS stations from station_config
+    const [stationConfigs] = await db.query(`
+      SELECT StationID, ServicesID, station_name, DeviceID
+      FROM station_config
+      WHERE ServicesID = 'EWS' AND is_active = 1
+      ORDER BY station_name
     `);
 
-    const [mana] = await db.query(`
-      SELECT *
-      FROM EWS_retrieved_db_data
-      WHERE StationID = 'ST019'
-      ORDER BY timestamp DESC
-    `);
+    const data = {};
+    
+    // Query data for each station dynamically
+    for (const config of stationConfigs) {
+      const [rows] = await db.query(`
+        SELECT *
+        FROM EWS_retrieved_db_data
+        WHERE StationID = ?
+        ORDER BY timestamp DESC
+      `, [config.StationID]);
+
+      // Use station_name as key (matching frontend expectations)
+      data[config.station_name] = rows;
+    }
 
     res.status(200).json({
       message: "Data Fetched",
-      totalStations: 2,
-      data: {
-        Vasudhara: vasudhara,
-        Mana: mana,
-      },
+      totalStations: stationConfigs.length,
+      data: data,
     });
   } catch (err) {
     console.error("❌ EWS /all error:", err.message);

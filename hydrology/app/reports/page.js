@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format, subDays, parseISO, isWithinInterval } from 'date-fns';
 import { 
   FiDownload, FiFilter, FiCalendar, FiClock, FiBarChart2, 
@@ -9,21 +9,33 @@ import Navbar from 'components/Navbar';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { useStationStatus } from '../../hooks/useStationStatus';
+import { useStations } from '../../hooks/useStations';
 
 const ReportsDashboard = () => {
   const router = useRouter();
-  // Station data
-  // <-- Per your request: only real EWS-supported stations kept (Option B)
-  const ewsStations = [
-    { name: "Vasudhara", slug: "vasudhara" },
-    { name: "Mana", slug: "mana" }
-  ];
-
-  const awsStations = [
-    { name: "Vasudhara", slug: "vasudhara" },
-    { name: "Mana", slug: "mana" },
-    { name: "Barrage (Lambagad)", slug: "vishnu_prayag" }
-  ];
+  const { awsStations: awsStationsData, ewsStations: ewsStationsData, loading: stationsLoading } = useStations();
+  
+  // Convert station data to format needed by reports page
+  const awsStations = awsStationsData.map(station => ({
+    name: station.station_name,
+    slug: station.station_name.toLowerCase().replace(/\s+/g, '_').replace(/[()]/g, ''),
+    stationId: station.StationID
+  }));
+  
+  const ewsStations = ewsStationsData.map(station => ({
+    name: station.station_name,
+    slug: station.station_name.toLowerCase().replace(/\s+/g, '_').replace(/[()]/g, ''),
+    stationId: station.StationID
+  }));
+  
+  // Build Station ID mapping dynamically
+  const STATION_ID_MAP = React.useMemo(() => {
+    const map = {};
+    [...awsStations, ...ewsStations].forEach(station => {
+      map[station.slug] = station.stationId;
+    });
+    return map;
+  }, [awsStations, ewsStations]);
 
   // State management
   const [stationType, setStationType] = useState('AWS');
@@ -40,12 +52,12 @@ const ReportsDashboard = () => {
   const [pdfLoading, setPdfLoading] = useState(false);
   const { getStationStatus } = useStationStatus();
   
-  // Station ID mapping
-  const STATION_ID_MAP = {
-    "vasudhara": "ST020",
-    "mana": "ST019",
-    "vishnu_prayag": "ST015",
-  };
+  // Initialize selected station when stations load
+  useEffect(() => {
+    if (!stationsLoading && awsStations.length > 0 && !selectedStation) {
+      setSelectedStation(awsStations[0].slug);
+    }
+  }, [stationsLoading, awsStations, selectedStation]);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -116,16 +128,26 @@ const ReportsDashboard = () => {
         let formattedData = [];
 
         // ------------------------
-        // AWS: same mapping as before
+        // AWS: dynamic mapping
         // ------------------------
         if (stationType === "AWS" && result?.data) {
-          // incoming keys are like result.data.Mana or result.data.Lambagad
-          const stationKey =
-            selectedStation.toLowerCase().includes("mana")
-              ? "Mana"
-              : "Lambagad";
-
-          const stationData = result.data?.[stationKey];
+          // Find station name from slug
+          const stationInfo = awsStations.find(s => s.slug === selectedStation);
+          let stationKey = stationInfo ? stationInfo.name : (selectedStation.toLowerCase().includes("mana") ? "Mana" : "Lambagad");
+          
+          // Handle Barrage/Lambagad mapping - API returns "Lambagad"
+          if (stationKey === "Barrage") {
+            stationKey = "Lambagad";
+          }
+          
+          // Try to find the data with the station key
+          let stationData = result.data?.[stationKey];
+          if (!stationData) {
+            // Try case-insensitive match
+            const keys = Object.keys(result.data || {});
+            const matchedKey = keys.find(k => k.toLowerCase() === stationKey.toLowerCase());
+            if (matchedKey) stationData = result.data?.[matchedKey];
+          }
 
           if (Array.isArray(stationData)) {
             formattedData = stationData.map((item) => ({
@@ -148,15 +170,21 @@ const ReportsDashboard = () => {
         }
 
         // ------------------------
-        // EWS: use result.data.Mana or result.data.Vasudhara
+        // EWS: dynamic mapping
         // ------------------------
         if (stationType === "EWS" && result?.data) {
-          const stationKey =
-            selectedStation.toLowerCase().includes("mana")
-              ? "Mana"
-              : "Vasudhara";
-
-          const stationData = result.data?.[stationKey];
+          // Find station name from slug
+          const stationInfo = ewsStations.find(s => s.slug === selectedStation);
+          let stationKey = stationInfo ? stationInfo.name : (selectedStation.toLowerCase().includes("mana") ? "Mana" : "Vasudhara");
+          
+          // Try to find the data with the station key
+          let stationData = result.data?.[stationKey];
+          if (!stationData) {
+            // Try case-insensitive match
+            const keys = Object.keys(result.data || {});
+            const matchedKey = keys.find(k => k.toLowerCase() === stationKey.toLowerCase());
+            if (matchedKey) stationData = result.data?.[matchedKey];
+          }
           const isVasudhara = stationKey === "Vasudhara";
 
           if (Array.isArray(stationData)) {

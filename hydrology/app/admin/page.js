@@ -3,7 +3,8 @@ import { motion } from "framer-motion";
 import AdminLayout from "../../components/AdminLayout";
 
 export default function AdminHome() {
-  const menuItems = [
+  // User Management Section
+  const userManagementItems = [
     {
       href: "/admin/users",
       icon: (
@@ -25,14 +26,38 @@ export default function AdminHome() {
       description: "View, edit, and delete user accounts"
     },
     {
+      href: "/admin/login-logs",
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+      title: "Login Logs",
+      description: "View user login activities and history"
+    }
+  ];
+
+  // Station Management Section
+  const stationManagementItems = [
+    {
       href: "/admin/stations",
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+      ),
+      title: "Register Station",
+      description: "Register a new station with CSV mapping"
+    },
+    {
+      href: "/admin/station-management",
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 6a4 4 0 110 8 4 4 0 010-8z" />
         </svg>
       ),
       title: "Manage Stations",
-      description: "Add, edit, and manage stations"
+      description: "View, edit, and delete registered stations"
     },
     {
       href: "/admin/station-status",
@@ -43,17 +68,11 @@ export default function AdminHome() {
       ),
       title: "Station Status",
       description: "Manage station status (Live/Offline/Maintenance)"
-    },
-    {
-      href: "/admin/login-logs",
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-      ),
-      title: "Login Logs",
-      description: "View user login activities and history"
-    },
+    }
+  ];
+
+  // Other/Settings Section
+  const otherItems = [
     {
       href: "/admin/settings",
       icon: (
@@ -66,34 +85,67 @@ export default function AdminHome() {
     }
   ];
 
+  const renderCard = (item, index) => (
+    <motion.a
+      key={item.href}
+      href={item.href}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05 }}
+      className="flex items-start p-5 bg-white rounded-xl shadow-sm hover:shadow-md border border-gray-200 hover:border-slate-300 transition-all duration-200 group"
+    >
+      <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-blue-100 group-hover:bg-blue-200 flex items-center justify-center transition-colors mr-4">
+        {item.icon}
+      </div>
+      <div className="flex-1">
+        <h3 className="font-semibold text-gray-800 group-hover:text-blue-700 mb-1 transition-colors">
+          {item.title}
+        </h3>
+        <p className="text-sm text-gray-500">
+          {item.description}
+        </p>
+      </div>
+      <svg className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+    </motion.a>
+  );
+
   return (
     <AdminLayout title="Admin Dashboard" subtitle="Manage your application settings" showBackButton={false}>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {menuItems.map((item, index) => (
-          <motion.a
-            key={item.href}
-            href={item.href}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className="flex items-start p-5 bg-white rounded-xl shadow-sm hover:shadow-md border border-gray-200 hover:border-slate-300 transition-all duration-200 group"
-          >
-            <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-blue-100 group-hover:bg-blue-200 flex items-center justify-center transition-colors mr-4">
-              {item.icon}
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-gray-800 group-hover:text-blue-700 mb-1 transition-colors">
-                {item.title}
-              </h3>
-              <p className="text-sm text-gray-500">
-                {item.description}
-              </p>
-            </div>
-            <svg className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </motion.a>
-        ))}
+      <div className="space-y-8">
+        {/* User Management Section */}
+        <div>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-1 w-12 bg-blue-600 rounded"></div>
+            <h2 className="text-2xl font-bold text-gray-800">User Management</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {userManagementItems.map((item, index) => renderCard(item, index))}
+          </div>
+        </div>
+
+        {/* Station Management Section */}
+        <div>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-1 w-12 bg-green-600 rounded"></div>
+            <h2 className="text-2xl font-bold text-gray-800">Station Management</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {stationManagementItems.map((item, index) => renderCard(item, index + userManagementItems.length))}
+          </div>
+        </div>
+
+        {/* Other/Settings Section */}
+        <div>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-1 w-12 bg-gray-600 rounded"></div>
+            <h2 className="text-2xl font-bold text-gray-800">Settings</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {otherItems.map((item, index) => renderCard(item, index + userManagementItems.length + stationManagementItems.length))}
+          </div>
+        </div>
       </div>
     </AdminLayout>
   );

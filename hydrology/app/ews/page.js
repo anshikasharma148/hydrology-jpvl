@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
@@ -12,22 +12,27 @@ import {
 import Navbar from "../../components/Navbar";
 import EWSDashboardGraph from "../../components/EWSDashboardGraph";
 import { useStationStatus } from "../../hooks/useStationStatus";
+import { useStations } from "../../hooks/useStations";
 
 const SplashScreen = dynamic(() => import("../../components/SplashScreen"), { ssr: false });
 
 export default function EWSPage() {
   const router = useRouter();
+  const { ewsStations: ewsStationsData, loading: stationsLoading } = useStations();
 
   const [liveStations, setLiveStations] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const { getStationStatus } = useStationStatus();
   
-  // Station ID mapping
-  const STATION_ID_MAP = {
-    "Vasudhara": "ST020",
-    "Mana": "ST019",
-  };
+  // Build Station ID mapping dynamically
+  const STATION_ID_MAP = React.useMemo(() => {
+    const map = {};
+    ewsStationsData.forEach(station => {
+      map[station.station_name] = station.StationID;
+    });
+    return map;
+  }, [ewsStationsData]);
 
   // INIT THEME
   useEffect(() => {
@@ -44,6 +49,12 @@ export default function EWSPage() {
 
   // FETCH STATION DATA
   useEffect(() => {
+    // Don't fetch if stations are still loading
+    if (stationsLoading || ewsStationsData.length === 0) {
+      setIsLoading(false);
+      return;
+    }
+
     const fetchData = async () => {
       setIsLoading(true);
 
@@ -56,9 +67,24 @@ export default function EWSPage() {
         const json = await res.json();
         
         // Process data to ensure timestamp matches the candidate record used for data
+        // Only process stations that exist in our dynamic list
         const processedData = {};
         if (json?.data) {
+          // Create a map of station name to config for quick lookup
+          const stationConfigMap = {};
+          ewsStationsData.forEach(config => {
+            stationConfigMap[config.station_name] = config;
+          });
+          
+          // Filter to only include stations from our dynamic list
+          const validStationNames = ewsStationsData.map(s => s.station_name);
           Object.entries(json.data).forEach(([station, arr]) => {
+            // Only process if station is in our dynamic list
+            if (!validStationNames.includes(station)) return;
+            
+            const stationConfig = stationConfigMap[station];
+            const selectedFields = stationConfig?.selected_fields || [];
+            
             if (Array.isArray(arr) && arr.length > 0) {
               // Find latest record by timestamp
               const latestRecord = arr.reduce((latest, current) => {
@@ -67,16 +93,28 @@ export default function EWSPage() {
                 return currentTime > latestTime ? current : latest;
               }, arr[0]);
               
-              // Find candidate with valid data
-              const candidate = arr.find((r) =>
-                [r.water_level, r.avg_surface_velocity, r.surface_velocity, r.water_dist_sensor, r.water_discharge, r.tilt_angle, r.flow_direction]
-                  .some((x) => x !== null && x !== undefined && x !== "")
-              ) || latestRecord;
+              // Find candidate with valid data - use selectedFields dynamically
+              let candidate = latestRecord;
+              if (selectedFields.length > 0) {
+                // Check if any selected field has valid data
+                candidate = arr.find((r) =>
+                  selectedFields.some(field => {
+                    const value = r[field];
+                    return value !== null && value !== undefined && value !== "";
+                  })
+                ) || latestRecord;
+              } else {
+                // Fallback to checking common fields if no selectedFields
+                candidate = arr.find((r) =>
+                  [r.water_level, r.avg_surface_velocity, r.surface_velocity, r.water_dist_sensor, r.water_discharge, r.tilt_angle, r.flow_direction]
+                    .some((x) => x !== null && x !== undefined && x !== "")
+                ) || latestRecord;
+              }
               
-              // Fix Mana timestamp format if needed
-              const fixManaTimestamp = (ts) => {
+              // Fix timestamp format if needed
+              const fixTimestamp = (ts) => {
                 if (!ts) return null;
-                if (station === "Mana" && ts.includes(" ") && !ts.includes("T")) {
+                if (ts.includes(" ") && !ts.includes("T")) {
                   return ts.replace(" ", "T") + "Z";
                 }
                 return ts;
@@ -85,11 +123,37 @@ export default function EWSPage() {
               // Use candidate timestamp (same record as data), fallback to latestRecord if missing
               processedData[station] = [{
                 ...candidate,
-                timestamp: fixManaTimestamp(candidate.timestamp) ?? fixManaTimestamp(latestRecord.timestamp),
+                timestamp: fixTimestamp(candidate.timestamp) ?? fixTimestamp(latestRecord.timestamp),
               }];
             } else {
-              processedData[station] = arr;
+              // No data - create empty entry
+              processedData[station] = [{
+                StationID: stationConfig?.StationID ?? null,
+                DeviceID: stationConfig?.DeviceID ?? null,
+                timestamp: null,
+              }];
             }
+          });
+          
+          // Ensure ALL stations from ewsStationsData appear, even if API didn't return them
+          ewsStationsData.forEach(config => {
+            const stationName = config.station_name;
+            if (!processedData[stationName]) {
+              processedData[stationName] = [{
+                StationID: config.StationID ?? null,
+                DeviceID: config.DeviceID ?? null,
+                timestamp: null,
+              }];
+            }
+          });
+        } else {
+          // If json.data is empty or missing, create entries for all stations
+          ewsStationsData.forEach(config => {
+            processedData[config.station_name] = [{
+              StationID: config.StationID ?? null,
+              DeviceID: config.DeviceID ?? null,
+              timestamp: null,
+            }];
           });
         }
         
@@ -105,7 +169,7 @@ export default function EWSPage() {
     fetchData();
     const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [stationsLoading, ewsStationsData]);
 
   // helpers
   const safeNum = (v, fixed = 2, isMaintenance = false) => {
@@ -215,15 +279,16 @@ export default function EWSPage() {
         </h1>
       </div>
 
-      <div className="flex justify-center items-center mt-6 sm:mt-8 md:mt-10 px-3 sm:px-4 md:px-6">
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-2 gap-2 sm:gap-3 md:gap-3 w-full md:w-auto justify-items-center">
+      <div className="flex justify-center items-start mt-6 sm:mt-8 md:mt-10 px-3 sm:px-4 md:px-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-4 md:gap-6 w-full max-w-7xl mx-auto">
 
-          {Object.keys(liveStations).map((station) => {
-            const item = liveStations[station]?.[0];
-            if (!item) return null;
+          {ewsStationsData.map((stationConfig) => {
+            const station = stationConfig.station_name;
+            const item = liveStations[station]?.[0] || null;
+            const selectedFields = stationConfig.selected_fields || [];
 
-            const status = statusType(item.water_discharge);
-            const statusInfo = getStationStatusInfo(station, item.timestamp);
+            const status = statusType(item?.water_discharge);
+            const statusInfo = getStationStatusInfo(station, item?.timestamp);
             const offline = statusInfo.status !== "live";
             const isMaintenance = statusInfo.status === "maintenance";
 
@@ -231,7 +296,7 @@ export default function EWSPage() {
               <div
                 key={station}
                 className={`
-                  w-full md:w-[260px] lg:w-[320px] xl:w-[360px]
+                  w-full
                   h-auto min-h-[320px] sm:min-h-[400px] md:min-h-[390px] lg:min-h-[550px]
                   rounded-lg sm:rounded-xl border shadow-lg sm:shadow-2xl p-3 sm:p-4 md:p-5
                   transition-all duration-300
@@ -285,150 +350,195 @@ export default function EWSPage() {
                 <p className="text-[10px] sm:text-xs opacity-70 mb-2 sm:mb-3">
                   Updated: {statusInfo.status === "offline" && statusInfo.offlineTimestamp 
                     ? formattedTime(statusInfo.offlineTimestamp) 
-                    : formattedTime(item.timestamp)}
+                    : item?.timestamp ? formattedTime(item.timestamp) : "No timestamp"}
                 </p>
 
                 <div className="space-y-1.5 sm:space-y-2 md:space-y-3">
-                  <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
-                    status === "alert" || status === "warning"
-                      ? isDarkMode ? "bg-red-500/20 border border-red-500/40" : "bg-red-100/70 border border-red-300"
-                      : isDarkMode ? "bg-green-500/20 border border-green-500/40" : "bg-green-100/70 border border-green-300"
-                  }`}>
-                    <span className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
-                      <Droplets size={10} className={`sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 flex-shrink-0 ${
+                  {/* Water Discharge - only if selected */}
+                  {selectedFields.includes('water_discharge') && (
+                    <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
+                      status === "alert" || status === "warning"
+                        ? isDarkMode ? "bg-red-500/20 border border-red-500/40" : "bg-red-100/70 border border-red-300"
+                        : isDarkMode ? "bg-green-500/20 border border-green-500/40" : "bg-green-100/70 border border-green-300"
+                    }`}>
+                      <span className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
+                        <Droplets size={10} className={`sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 flex-shrink-0 ${
+                          status === "alert" || status === "warning" ? "text-red-400" : "text-green-400"
+                        }`} /> 
+                        <span className="truncate font-semibold">Discharge</span>
+                      </span>
+                      <span className={`font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0 font-semibold ${
                         status === "alert" || status === "warning" ? "text-red-400" : "text-green-400"
-                      }`} /> 
-                      <span className="truncate font-semibold">Discharge</span>
-                    </span>
-                    <span className={`font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0 font-semibold ${
-                      status === "alert" || status === "warning" ? "text-red-400" : "text-green-400"
-                    }`}>{safeNum(item.water_discharge, 2, isMaintenance)} {isMaintenance ? "" : "m³/s"}</span>
-                  </div>
+                      }`}>{safeNum(item?.water_discharge, 2, isMaintenance)} {isMaintenance ? "" : "m³/s"}</span>
+                    </div>
+                  )}
 
-                  <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
-                    isDarkMode ? "bg-slate-800/30" : "bg-blue-100/50"
-                  }`}>
-                    <span className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
-                      <Waves size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" /> 
-                      <span className="truncate">Level</span>
-                    </span>
-                    <span className="font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0">{safeNum(item.water_level, 2, isMaintenance)} {isMaintenance ? "" : "m"}</span>
-                  </div>
-
-                  <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
-                    isDarkMode ? "bg-slate-800/30" : "bg-blue-100/50"
-                  }`}>
-                    <span className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
-                      <Activity size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" />
-                      <span className="truncate">Velocity</span>
-                    </span>
-                    <span className="font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0">
-  {safeNum(item.surface_velocity, 2, isMaintenance)} {isMaintenance ? "" : "m/s"}
-</span>
-
-                  </div>
-
-                  <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
-                    isDarkMode ? "bg-slate-800/30" : "bg-blue-100/50"
-                  }`}>
-                    <span className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
-                      <Ruler size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" />
-                      <span className="truncate">Water Distance from Sensor</span>
-                    </span>
-                    <span className="font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0">{safeNum(item.water_dist_sensor, 2, isMaintenance)} {isMaintenance ? "" : "m"}</span>
-                  </div>
-                </div>
-
-                <div className="border-t mt-2 sm:mt-3 md:mt-4 pt-2 sm:pt-3 md:pt-4 space-y-1.5 sm:space-y-2 md:space-y-3">
-                  <p className="text-[10px] sm:text-xs md:text-sm font-bold uppercase tracking-wider text-blue-400">Device Data</p>
-
-                  <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
-                    <span className="flex items-center gap-1 sm:gap-2 truncate">
-                      <Compass size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-yellow-400 flex-shrink-0" /> 
-                      <span className="truncate">Tilt Angle</span>
-                    </span>
-                    <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                      {safeNum(item.tilt_angle, 1, isMaintenance)} {isMaintenance ? "" : "°"}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
-                    <span className="flex items-center gap-1 sm:gap-2 truncate">
-                      <Compass size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-green-500 flex-shrink-0" /> 
-                      <span className="truncate">Flow Dir</span>
-                    </span>
-                    <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                      {isMaintenance ? "NIL" : formatFlowDirection(item.flow_direction)}
-                    </span>
-                  </div>
-
-                  {station === "Mana" && (
-                    <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
-                      <span className="flex items-center gap-1 sm:gap-2 truncate">
-                        <Gauge size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-purple-400 flex-shrink-0" /> 
-                        <span className="truncate">SNR</span>
+                  {/* Water Level - only if selected */}
+                  {selectedFields.includes('water_level') && (
+                    <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
+                      isDarkMode ? "bg-slate-800/30" : "bg-blue-100/50"
+                    }`}>
+                      <span className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
+                        <Waves size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" /> 
+                        <span className="truncate">Level</span>
                       </span>
-                      <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                        {safeNum(item.SNR, 2, isMaintenance)} {isMaintenance ? "" : "dB"}
+                      <span className="font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0">{safeNum(item?.water_level, 2, isMaintenance)} {isMaintenance ? "" : "m"}</span>
+                    </div>
+                  )}
+
+                  {/* Surface Velocity - only if selected */}
+                  {selectedFields.includes('surface_velocity') && (
+                    <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
+                      isDarkMode ? "bg-slate-800/30" : "bg-blue-100/50"
+                    }`}>
+                      <span className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
+                        <Activity size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" />
+                        <span className="truncate">Velocity</span>
                       </span>
+                      <span className="font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0">
+                        {safeNum(item?.surface_velocity, 2, isMaintenance)} {isMaintenance ? "" : "m/s"}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Average Surface Velocity - only if selected */}
+                  {selectedFields.includes('avg_surface_velocity') && (
+                    <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
+                      isDarkMode ? "bg-slate-800/30" : "bg-blue-100/50"
+                    }`}>
+                      <span className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
+                        <Activity size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" />
+                        <span className="truncate">Avg Velocity</span>
+                      </span>
+                      <span className="font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0">
+                        {safeNum(item?.avg_surface_velocity, 2, isMaintenance)} {isMaintenance ? "" : "m/s"}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Water Distance Sensor - only if selected */}
+                  {selectedFields.includes('water_dist_sensor') && (
+                    <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
+                      isDarkMode ? "bg-slate-800/30" : "bg-blue-100/50"
+                    }`}>
+                      <span className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
+                        <Ruler size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" />
+                        <span className="truncate">Water Distance from Sensor</span>
+                      </span>
+                      <span className="font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0">{safeNum(item?.water_dist_sensor, 2, isMaintenance)} {isMaintenance ? "" : "m"}</span>
                     </div>
                   )}
                 </div>
 
-                {/* Power Section - Only for Vasudhara */}
-                {station === "Vasudhara" && (
+                {/* Device Data Section - only show if at least one device field is selected */}
+                {(selectedFields.includes('tilt_angle') || selectedFields.includes('flow_direction') || selectedFields.includes('SNR')) && (
+                  <div className="border-t mt-2 sm:mt-3 md:mt-4 pt-2 sm:pt-3 md:pt-4 space-y-1.5 sm:space-y-2 md:space-y-3">
+                    <p className="text-[10px] sm:text-xs md:text-sm font-bold uppercase tracking-wider text-blue-400">Device Data</p>
+
+                    {selectedFields.includes('tilt_angle') && (
+                      <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
+                        <span className="flex items-center gap-1 sm:gap-2 truncate">
+                          <Compass size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-yellow-400 flex-shrink-0" /> 
+                          <span className="truncate">Tilt Angle</span>
+                        </span>
+                        <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                          {safeNum(item?.tilt_angle, 1, isMaintenance)} {isMaintenance ? "" : "°"}
+                        </span>
+                      </div>
+                    )}
+
+                    {selectedFields.includes('flow_direction') && (
+                      <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
+                        <span className="flex items-center gap-1 sm:gap-2 truncate">
+                          <Compass size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-green-500 flex-shrink-0" /> 
+                          <span className="truncate">Flow Dir</span>
+                        </span>
+                        <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                          {isMaintenance ? "NIL" : formatFlowDirection(item?.flow_direction)}
+                        </span>
+                      </div>
+                    )}
+
+                    {selectedFields.includes('SNR') && (
+                      <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
+                        <span className="flex items-center gap-1 sm:gap-2 truncate">
+                          <Gauge size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-purple-400 flex-shrink-0" /> 
+                          <span className="truncate">SNR</span>
+                        </span>
+                        <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                          {safeNum(item?.SNR, 2, isMaintenance)} {isMaintenance ? "" : "dB"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Power Section - only show if at least one power field is selected */}
+                {(selectedFields.includes('internal_temperature') || selectedFields.includes('charge_current') || 
+                  selectedFields.includes('observed_current') || selectedFields.includes('battery_voltage') || 
+                  selectedFields.includes('solar_panel_tracking')) && (
                   <div className="border-t mt-2 sm:mt-3 md:mt-4 pt-2 sm:pt-3 md:pt-4 space-y-1.5 sm:space-y-2 md:space-y-3">
                     <p className="text-[10px] sm:text-xs md:text-sm font-bold uppercase tracking-wider text-orange-400">Power</p>
 
-                    <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
-                      <span className="flex items-center gap-1 sm:gap-2 truncate">
-                        <Thermometer size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-red-400 flex-shrink-0" /> 
-                        <span className="truncate">Internal Temperature</span>
-                      </span>
-                      <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                        {safeNum(item.internal_temperature, 1, isMaintenance)} {isMaintenance ? "" : "°C"}
-                      </span>
-                    </div>
+                    {selectedFields.includes('internal_temperature') && (
+                      <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
+                        <span className="flex items-center gap-1 sm:gap-2 truncate">
+                          <Thermometer size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-red-400 flex-shrink-0" /> 
+                          <span className="truncate">Internal Temperature</span>
+                        </span>
+                        <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                          {safeNum(item?.internal_temperature, 1, isMaintenance)} {isMaintenance ? "" : "°C"}
+                        </span>
+                      </div>
+                    )}
 
-                    <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
-                      <span className="flex items-center gap-1 sm:gap-2 truncate">
-                        <BatteryCharging size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-green-400 flex-shrink-0" /> 
-                        <span className="truncate">Charge Current</span>
-                      </span>
-                      <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                        {safeNum(item.charge_current, 4, isMaintenance)} {isMaintenance ? "" : "A"}
-                      </span>
-                    </div>
+                    {selectedFields.includes('charge_current') && (
+                      <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
+                        <span className="flex items-center gap-1 sm:gap-2 truncate">
+                          <BatteryCharging size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-green-400 flex-shrink-0" /> 
+                          <span className="truncate">Charge Current</span>
+                        </span>
+                        <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                          {safeNum(item?.charge_current, 4, isMaintenance)} {isMaintenance ? "" : "A"}
+                        </span>
+                      </div>
+                    )}
 
-                    <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
-                      <span className="flex items-center gap-1 sm:gap-2 truncate">
-                        <Zap size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-yellow-400 flex-shrink-0" /> 
-                        <span className="truncate">Absorbed Current</span>
-                      </span>
-                      <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                        {safeNum(item.observed_current, 4, isMaintenance)} {isMaintenance ? "" : "A"}
-                      </span>
-                    </div>
+                    {selectedFields.includes('observed_current') && (
+                      <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
+                        <span className="flex items-center gap-1 sm:gap-2 truncate">
+                          <Zap size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-yellow-400 flex-shrink-0" /> 
+                          <span className="truncate">Absorbed Current</span>
+                        </span>
+                        <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                          {safeNum(item?.observed_current, 4, isMaintenance)} {isMaintenance ? "" : "A"}
+                        </span>
+                      </div>
+                    )}
 
-                    <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
-                      <span className="flex items-center gap-1 sm:gap-2 truncate">
-                        <Battery size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" /> 
-                        <span className="truncate">Battery Voltage</span>
-                      </span>
-                      <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                        {safeNum(item.battery_voltage, 1, isMaintenance)} {isMaintenance ? "" : "V"}
-                      </span>
-                    </div>
+                    {selectedFields.includes('battery_voltage') && (
+                      <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
+                        <span className="flex items-center gap-1 sm:gap-2 truncate">
+                          <Battery size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" /> 
+                          <span className="truncate">Battery Voltage</span>
+                        </span>
+                        <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                          {safeNum(item?.battery_voltage, 1, isMaintenance)} {isMaintenance ? "" : "V"}
+                        </span>
+                      </div>
+                    )}
 
-                    <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
-                      <span className="flex items-center gap-1 sm:gap-2 truncate">
-                        <Sun size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-orange-400 flex-shrink-0" /> 
-                        <span className="truncate">Solar Panel Tracking</span>
-                      </span>
-                      <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-                        {safeNum(item.solar_panel_tracking, 1, isMaintenance)} {isMaintenance ? "" : "V"}
-                      </span>
-                    </div>
+                    {selectedFields.includes('solar_panel_tracking') && (
+                      <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
+                        <span className="flex items-center gap-1 sm:gap-2 truncate">
+                          <Sun size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-orange-400 flex-shrink-0" /> 
+                          <span className="truncate">Solar Panel Tracking</span>
+                        </span>
+                        <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                          {safeNum(item?.solar_panel_tracking, 1, isMaintenance)} {isMaintenance ? "" : "V"}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
 

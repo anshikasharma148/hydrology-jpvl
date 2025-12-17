@@ -4,6 +4,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import ReactECharts from "echarts-for-react";
 import { Button } from "@/components/ui/button";
 import { useStationStatus } from "../../hooks/useStationStatus";
+import { useStations } from "../../hooks/useStations";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,18 +34,7 @@ import {
 import Navbar from "components/Navbar";
 import { useRouter, useSearchParams } from "next/navigation";
 
-// KEEP ONLY 2 EWS STATIONS
-const ewsStations = [
-  { name: "Vasudhara", slug: "vasudhara" },
-  { name: "Mana", slug: "mana" },
-];
-
-// AWS stations unchanged
-const awsStations = [
-  { name: "Vasudhara", slug: "vasudhara" },
-  { name: "Mana", slug: "mana" },
-  { name: "Barrage (Lambagad)", slug: "vishnu_prayag" },
-];
+// Stations will be loaded dynamically via useStations hook
 
 // Background
 const GridPattern = () => (
@@ -73,18 +63,46 @@ const MinimalOrbs = () => (
 function TrendsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { awsStations: awsStationsData, ewsStations: ewsStationsData, loading: stationsLoading } = useStations();
+  
+  // Convert station data to format needed by trends page
+  const awsStations = React.useMemo(() => {
+    return awsStationsData.map(station => ({
+      name: station.station_name,
+      slug: station.station_name.toLowerCase().replace(/\s+/g, '_').replace(/[()]/g, ''),
+      stationId: station.StationID
+    }));
+  }, [awsStationsData]);
+  
+  const ewsStations = React.useMemo(() => {
+    return ewsStationsData.map(station => ({
+      name: station.station_name,
+      slug: station.station_name.toLowerCase().replace(/\s+/g, '_').replace(/[()]/g, ''),
+      stationId: station.StationID
+    }));
+  }, [ewsStationsData]);
+  
+  // Build Station ID mapping dynamically
+  const STATION_ID_MAP = React.useMemo(() => {
+    const map = {};
+    [...awsStations, ...ewsStations].forEach(station => {
+      map[station.slug] = station.stationId;
+    });
+    return map;
+  }, [awsStations, ewsStations]);
   
   // Initialize from URL parameters
   const getInitialState = () => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
+      const defaultStation = awsStations.length > 0 ? awsStations[0].slug : null;
       return {
         type: params.get('type') || "AWS",
-        station: params.get('station') || awsStations[0].slug,
+        station: params.get('station') || defaultStation,
         parameter: params.get('parameter') || null,
       };
     }
-    return { type: "AWS", station: awsStations[0].slug, parameter: null };
+    return { type: "AWS", station: awsStations.length > 0 ? awsStations[0].slug : null, parameter: null };
   };
   
   const [selectedType, setSelectedType] = useState(() => getInitialState().type);
@@ -93,7 +111,7 @@ function TrendsPageContent() {
   
   // Update state when URL parameters change
   useEffect(() => {
-    if (searchParams) {
+    if (searchParams && !stationsLoading) {
       const type = searchParams.get('type');
       const station = searchParams.get('station');
       const parameter = searchParams.get('parameter');
@@ -104,7 +122,7 @@ function TrendsPageContent() {
         setSelectedParameter(parameter);
       }
     }
-  }, [searchParams, selectedType, selectedStation, selectedParameter]);
+  }, [searchParams, selectedType, selectedStation, selectedParameter, stationsLoading]);
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -114,13 +132,6 @@ function TrendsPageContent() {
   const [filter, setFilter] = useState("today");
   const [customMode, setCustomMode] = useState("single");
   const [customDate, setCustomDate] = useState(undefined);
-  
-  // Station ID mapping
-  const STATION_ID_MAP = {
-    "vasudhara": "ST020",
-    "mana": "ST019",
-    "vishnu_prayag": "ST015",
-  };
 
   // Protect route
   useEffect(() => {
@@ -130,8 +141,19 @@ function TrendsPageContent() {
     }
   }, []);
 
+  // Wait for stations to load before initializing
+  useEffect(() => {
+    if (!stationsLoading && awsStations.length > 0 && !selectedStation) {
+      setSelectedStation(awsStations[0].slug);
+    }
+  }, [stationsLoading, awsStations, selectedStation]);
+
   // MAIN FETCH
   const fetchData = async () => {
+    // Don't fetch if stations are still loading or no station selected
+    if (stationsLoading || !selectedStation) {
+      return;
+    }
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
@@ -157,29 +179,51 @@ function TrendsPageContent() {
       let formattedData = [];
 
       if (selectedType === "AWS") {
-        // Map station slug to API key
-        let key;
-        if (selectedStation.includes("mana")) {
-          key = "Mana";
-        } else if (selectedStation.includes("vasudhara")) {
-          key = "Vasudhara";
-        } else {
-          key = "Lambagad";
+        // Find station from dynamic list
+        const stationInfo = awsStations.find(s => s.slug === selectedStation);
+        if (!stationInfo) {
+          setLoading(false);
+          setData([]);
+          setLatestTimestamp(null);
+          return;
         }
-
-        const arr = raw?.data?.[key] || [];
+        
+        const stationName = stationInfo.name;
+        // Try to find data using station name
+        let key = stationName;
+        let arr = raw?.data?.[key] || [];
+        
+        // Handle Barrage/Lambagad mapping
+        if (arr.length === 0 && (stationName === "Barrage" || stationName === "Lambagad")) {
+          key = raw?.data?.["Lambagad"] ? "Lambagad" : (raw?.data?.["Barrage"] ? "Barrage" : null);
+          arr = raw?.data?.[key] || [];
+        }
+        
+        // Try case-insensitive match
+        if (arr.length === 0) {
+          const keys = Object.keys(raw?.data || {});
+          const matchedKey = keys.find(k => k.toLowerCase() === stationName.toLowerCase());
+          if (matchedKey) {
+            key = matchedKey;
+            arr = raw?.data?.[matchedKey] || [];
+          }
+        }
+        
+        // Only proceed if we have data - don't show empty data for stations without data
+        if (arr.length === 0) {
+          setLoading(false);
+          setData([]);
+          setLatestTimestamp(null);
+          return;
+        }
         
         // Get the latest timestamp from raw data (before filtering)
-        if (arr.length > 0) {
-          const latest = arr.reduce((latest, current) => {
-            const latestTime = new Date(latest.timestamp || 0).getTime();
-            const currentTime = new Date(current.timestamp || 0).getTime();
-            return currentTime > latestTime ? current : latest;
-          }, arr[0]);
-          setLatestTimestamp(latest.timestamp);
-        } else {
-          setLatestTimestamp(null);
-        }
+        const latest = arr.reduce((latest, current) => {
+          const latestTime = new Date(latest.timestamp || 0).getTime();
+          const currentTime = new Date(current.timestamp || 0).getTime();
+          return currentTime > latestTime ? current : latest;
+        }, arr[0]);
+        setLatestTimestamp(latest.timestamp);
 
         formattedData = arr.map((item) => ({
           timestamp: item.timestamp,
@@ -195,9 +239,10 @@ function TrendsPageContent() {
           avg_PIR: parseFloat(item.avg_PIR),
         }));
       } else {
-        // NEW EWS API
-        const key = selectedStation === "mana" ? "Mana" : "Vasudhara";
-        const isVasudhara = key === "Vasudhara";
+        // NEW EWS API - Find station name from slug
+        const stationInfo = ewsStations.find(s => s.slug === selectedStation);
+        const key = stationInfo ? stationInfo.name : (selectedStation === "mana" ? "Mana" : "Vasudhara");
+        const isVasudhara = key === "Vasudhara" || key.toLowerCase().includes("vasudhara");
 
         const arr = raw?.data?.[key] || [];
         
@@ -349,9 +394,14 @@ function TrendsPageContent() {
   const getEwsFields = () => {
     if (selectedType !== "EWS") return [];
     
-    if (selectedStation === "vasudhara") {
+    // Find station info to determine which fields to show
+    const stationInfo = ewsStations.find(s => s.slug === selectedStation);
+    if (!stationInfo) return baseEwsFields;
+    
+    const stationName = stationInfo.name.toLowerCase();
+    if (stationName.includes("vasudhara")) {
       return [...baseEwsFields, ...vasudharaFields];
-    } else if (selectedStation === "mana") {
+    } else if (stationName.includes("mana")) {
       return [...baseEwsFields, ...manaFields];
     }
     return baseEwsFields;
@@ -699,8 +749,9 @@ function TrendsPageContent() {
                   key={type}
                   onClick={() => {
                     setSelectedType(type);
+                    const stations = type === "AWS" ? awsStations : ewsStations;
                     setSelectedStation(
-                      type === "AWS" ? awsStations[0].slug : "vasudhara"
+                      stations.length > 0 ? stations[0].slug : null
                     );
                     setSelectedParameter(null);
                     router.push('/trends');

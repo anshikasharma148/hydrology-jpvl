@@ -5,15 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNotification } from "../../../components/NotificationToast";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import AdminLayout from "../../../components/AdminLayout";
-
-// Station configuration
-const STATIONS = [
-  { id: "ST015", name: "Lambagad/Barrage", serviceType: "AWS", icon: "🌡️" },
-  { id: "ST019", name: "Mana", serviceType: "AWS", icon: "🌡️" },
-  { id: "ST020", name: "Vasudhara", serviceType: "AWS", icon: "🌡️" },
-  { id: "ST019", name: "Mana", serviceType: "EWS", icon: "💧" },
-  { id: "ST020", name: "Vasudhara", serviceType: "EWS", icon: "💧" },
-];
+import { useStations } from "../../../hooks/useStations";
 
 // Get backend URL - use localhost if running locally, otherwise use Render
 const getBackendUrl = () => {
@@ -26,6 +18,7 @@ const getBackendUrl = () => {
 export default function StationStatusManagement() {
   const router = useRouter();
   const { showAlert, showConfirm } = useNotification();
+  const { stations, loading: stationsLoading } = useStations();
   const [statuses, setStatuses] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState({});
@@ -37,6 +30,14 @@ export default function StationStatusManagement() {
   useEffect(() => {
     fetchStatuses();
   }, []);
+
+  // Build stations array from fetched data
+  const STATIONS = stations.map(station => ({
+    id: station.StationID,
+    name: station.station_name,
+    serviceType: station.ServicesID,
+    icon: station.ServicesID === "AWS" ? "🌡️" : "💧"
+  }));
 
   const fetchStatuses = async () => {
     try {
@@ -236,7 +237,7 @@ export default function StationStatusManagement() {
     }
   };
 
-  if (loading) {
+  if (loading || stationsLoading) {
     return <LoadingSpinner message="Loading station statuses..." />;
   }
 

@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup, Tooltip, Polyline } from "react
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useStationStatus } from "../hooks/useStationStatus";
+import { useStations } from "../hooks/useStations";
 import {
   Thermometer,
   Droplets,
@@ -87,56 +88,119 @@ const FreshSensorMap = () => {
   const [ewsData, setEwsData] = useState({});
   const [loading, setLoading] = useState(true);
   const { getStationStatus } = useStationStatus();
+  const { allStations, awsStations, ewsStations, loading: stationsLoading } = useStations();
   
-  // Station ID mapping
-  const STATION_ID_MAP = {
-    "mana": "ST019",
-    "vasudhara": "ST020",
-    "barrage": "ST015",
-  };
+  // Build stations array dynamically from database
+  const stations = React.useMemo(() => {
+    if (!allStations || allStations.length === 0) {
+      // Fallback to hardcoded stations if database is empty
+      return [
+        {
+          key: "mana",
+          name: "Mana",
+          lat: 30.763327,
+          lng: 79.49845,
+          hasEws: true,
+          image: "/dash_station_img/mana.jpg",
+          stationId: "ST019",
+        },
+        {
+          key: "vasudhara",
+          name: "Vasudhara",
+          lat: 30.7880086,
+          lng: 79.452111,
+          hasEws: true,
+          image: "/dash_station_img/vasudhara.png",
+          stationId: "ST020",
+        },
+        {
+          key: "barrage",
+          name: "Barrage",
+          lat: dmsToDecimal(30, 40, 20.9),
+          lng: dmsToDecimal(79, 30, 49.0),
+          hasEws: false,
+          image: "/dash_station_img/barrage.jpg",
+          stationId: "ST015",
+        },
+      ];
+    }
+    
+    // Get EWS station names for hasEws check
+    const ewsStationNames = new Set(ewsStations.map(s => s.station_name));
+    
+    return allStations.map(station => {
+      const slug = station.station_name.toLowerCase().replace(/\s+/g, '_').replace(/[()]/g, '');
+      // Use coordinates from database if available, otherwise use defaults
+      const lat = station.Latitude ? parseFloat(station.Latitude) : (
+        station.station_name === "Mana" ? 30.763327 :
+        station.station_name === "Vasudhara" ? 30.7880086 :
+        station.station_name === "Barrage" || station.station_name === "Lambagad" ? dmsToDecimal(30, 40, 20.9) :
+        30.775 // Default center
+      );
+      const lng = station.Longitude ? parseFloat(station.Longitude) : (
+        station.station_name === "Mana" ? 79.49845 :
+        station.station_name === "Vasudhara" ? 79.452111 :
+        station.station_name === "Barrage" || station.station_name === "Lambagad" ? dmsToDecimal(79, 30, 49.0) :
+        79.48 // Default center
+      );
+      
+      // Determine image path (use defaults for known stations, fallback for new ones)
+      let image = "/dash_station_img/default.png";
+      if (station.station_name === "Mana") image = "/dash_station_img/mana.jpg";
+      else if (station.station_name === "Vasudhara") image = "/dash_station_img/vasudhara.png";
+      else if (station.station_name === "Barrage" || station.station_name === "Lambagad") image = "/dash_station_img/barrage.jpg";
+      
+      return {
+        key: slug,
+        name: station.station_name,
+        lat,
+        lng,
+        hasEws: ewsStationNames.has(station.station_name),
+        image,
+        stationId: station.StationID,
+        serviceId: station.ServicesID,
+      };
+    });
+  }, [allStations, ewsStations]);
+  
+  // Build Station ID mapping dynamically
+  const STATION_ID_MAP = React.useMemo(() => {
+    const map = {};
+    stations.forEach(s => {
+      map[s.key] = s.stationId;
+    });
+    return map;
+  }, [stations]);
 
-  const stations = [
-    {
-      key: "mana",
-      name: "Mana",
-      lat: 30.763327,
-      lng: 79.49845,
-      hasEws: true,
-      image: "/dash_station_img/mana.jpg",
-    },
-    {
-      key: "vasudhara",
-      name: "Vasudhara",
-      lat: 30.7880086,
-      lng: 79.452111,
-      hasEws: true,
-      image: "/dash_station_img/vasudhara.png",
-    },
-    {
-      key: "barrage",
-      name: "Barrage",
-      lat: dmsToDecimal(30, 40, 20.9),
-      lng: dmsToDecimal(79, 30, 49.0),
-      hasEws: false,
-      image: "/dash_station_img/barrage.jpg",
-    },
-  ];
-
-  // River paths: Simple linear connection Barrage -> Mana -> Vasudhara
-  const riverPaths = [
-    // Path 1: Barrage to Mana
-    [
-      [dmsToDecimal(30, 40, 20.9), dmsToDecimal(79, 30, 49.0)], // Barrage
-      [30.763327, 79.49845], // Mana
-    ],
-    // Path 2: Mana to Vasudhara
-    [
-      [30.763327, 79.49845], // Mana
-      [30.7880086, 79.452111], // Vasudhara
-    ],
-  ];
+  // River paths: Build dynamically from station coordinates
+  const riverPaths = React.useMemo(() => {
+    if (stations.length < 2) return [];
+    
+    // Sort stations by latitude (north to south) or longitude (west to east)
+    const sorted = [...stations].sort((a, b) => {
+      // Sort by latitude (north to south) or by name for consistent ordering
+      if (a.lat !== b.lat) return b.lat - a.lat; // North to south
+      return a.name.localeCompare(b.name);
+    });
+    
+    // Create paths between consecutive stations
+    const paths = [];
+    for (let i = 0; i < sorted.length - 1; i++) {
+      paths.push([
+        [sorted[i].lat, sorted[i].lng],
+        [sorted[i + 1].lat, sorted[i + 1].lng],
+      ]);
+    }
+    return paths;
+  }, [stations]);
 
   const fetchData = async () => {
+    // Wait for stations to load
+    if (stationsLoading || stations.length === 0) {
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     try {
       // AWS
@@ -144,11 +208,27 @@ const FreshSensorMap = () => {
       const awsJson = await awsRes.json();
       const awsFinal = {};
       if (awsJson?.data) {
-        Object.entries(awsJson.data).forEach(([key, arr]) => {
-          if (arr && arr.length > 0) {
-            const k = key.toLowerCase();
-            if (k === "lambagad") awsFinal["barrage"] = arr[0];
-            awsFinal[k] = arr[0];
+        // Map API data to station keys from database
+        stations.forEach(station => {
+          if (station.serviceId === "AWS") {
+            const stationName = station.name;
+            let data = awsJson.data[stationName];
+            
+            // Handle Barrage/Lambagad mapping
+            if (!data && (stationName === "Barrage" || stationName === "Lambagad")) {
+              data = awsJson.data["Lambagad"] || awsJson.data["Barrage"];
+            }
+            
+            // Try case-insensitive match
+            if (!data) {
+              const keys = Object.keys(awsJson.data || {});
+              const matchedKey = keys.find(k => k.toLowerCase() === stationName.toLowerCase());
+              if (matchedKey) data = awsJson.data[matchedKey];
+            }
+            
+            if (data && Array.isArray(data) && data.length > 0) {
+              awsFinal[station.key] = data[0];
+            }
           }
         });
       }
@@ -158,8 +238,23 @@ const FreshSensorMap = () => {
       const ewsJson = await ewsRes.json();
       const ewsFinal = {};
       if (ewsJson?.data) {
-        Object.entries(ewsJson.data).forEach(([key, arr]) => {
-          if (arr && arr.length > 0) ewsFinal[key.toLowerCase()] = arr[0];
+        // Map API data to station keys from database
+        stations.forEach(station => {
+          if (station.serviceId === "EWS") {
+            const stationName = station.name;
+            let data = ewsJson.data[stationName];
+            
+            // Try case-insensitive match
+            if (!data) {
+              const keys = Object.keys(ewsJson.data || {});
+              const matchedKey = keys.find(k => k.toLowerCase() === stationName.toLowerCase());
+              if (matchedKey) data = ewsJson.data[matchedKey];
+            }
+            
+            if (data && Array.isArray(data) && data.length > 0) {
+              ewsFinal[station.key] = data[0];
+            }
+          }
         });
       }
 
@@ -174,7 +269,7 @@ const FreshSensorMap = () => {
     fetchData();
     const interval = setInterval(fetchData, 15000);
     return () => clearInterval(interval);
-  }, []);
+  }, [stationsLoading, stations.length]);
 
   // CRITICAL: fixed z-index + tooltip stacking
   useEffect(() => {
@@ -235,9 +330,17 @@ const FreshSensorMap = () => {
       className: "rounded-full border-[3px] border-white shadow-xl",
     });
 
+  // Calculate map center from stations
+  const mapCenter = React.useMemo(() => {
+    if (stations.length === 0) return [30.775, 79.48]; // Default center
+    const avgLat = stations.reduce((sum, s) => sum + s.lat, 0) / stations.length;
+    const avgLng = stations.reduce((sum, s) => sum + s.lng, 0) / stations.length;
+    return [avgLat, avgLng];
+  }, [stations]);
+
   return (
     <div className="relative w-full h-full min-h-[500px] rounded-lg overflow-hidden shadow-xl">
-      <MapContainer center={[30.775, 79.48]} zoom={12} className="w-full h-full z-0">
+      <MapContainer center={mapCenter} zoom={12} className="w-full h-full z-0">
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
         {/* Stations */}
