@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import AdminLayout from '../../../components/AdminLayout';
 
 const AdminUserForm = () => {
   const [formData, setFormData] = useState({
@@ -72,14 +73,14 @@ const AdminUserForm = () => {
   const steps = ['User Details', 'Access Settings', 'Password Settings'];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-blue-50 to-gray-200 p-4 sm:p-6 flex items-center justify-center">
-      <div className="w-full max-w-5xl bg-white rounded-2xl shadow-lg overflow-hidden">
+    <AdminLayout title="Assign Users" subtitle="Add a new user with system access and role assignment">
+      <div className="w-full max-w-5xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-6 sm:p-10">
           {/* ✅ Stepper */}
           <div className="mb-10 relative">
             <div className="absolute top-4 left-0 w-full h-0.5 bg-gray-300"></div>
             <div
-              className="absolute top-4 left-0 h-0.5 bg-blue-500 transition-all duration-500"
+              className="absolute top-4 left-0 h-0.5 bg-blue-600 transition-all duration-500"
               style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
             ></div>
 
@@ -91,7 +92,7 @@ const AdminUserForm = () => {
                     <div
                       className={`w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-full border-2 transition-colors duration-300 ${
                         currentStep >= step
-                          ? 'bg-blue-500 border-blue-500 text-white'
+                          ? 'bg-blue-600 border-blue-600 text-white'
                           : 'bg-white border-gray-300 text-gray-400'
                       }`}
                     >
@@ -106,15 +107,6 @@ const AdminUserForm = () => {
             </div>
           </div>
 
-          {/* ✅ Header */}
-          <div className="text-center mb-10 relative">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2 tracking-tight">
-              Create New User
-            </h1>
-            <p className="text-gray-600 text-sm sm:text-base">
-              Add a new user with system access and role assignment
-            </p>
-          </div>
 
           {/* ✅ Messages */}
           {successMessage && (
@@ -284,7 +276,7 @@ const AdminUserForm = () => {
                 type="submit"
                 disabled={isSubmitting}
                 onClick={() => setCurrentStep(steps.length)}
-                className={`w-full bg-gradient-to-r from-blue-500 to-green-500 text-white py-3 sm:py-4 px-4 rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-300 font-semibold text-sm sm:text-lg ${
+                className={`w-full bg-blue-600 hover:bg-blue-700 text-white py-3 sm:py-4 px-4 rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-300 font-semibold text-sm sm:text-lg ${
                   isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
                 }`}
               >
@@ -294,7 +286,7 @@ const AdminUserForm = () => {
           </form>
         </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 };
 

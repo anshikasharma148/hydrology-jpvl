@@ -1,6 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { useNotification } from "../../../components/NotificationToast";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import AdminLayout from "../../../components/AdminLayout";
 
 export default function UserManagement() {
   const { showAlert, showConfirm } = useNotification();
@@ -97,23 +100,11 @@ const handleResetPassword = async (userId, userName) => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-100 via-blue-50 to-gray-200 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-t-2 border-b-2 border-indigo-500"></div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading users..." />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-blue-50 to-gray-200 p-4 sm:p-6">
-      <div className="max-w-full mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">User Management</h1>
-          <p className="text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">
-            Manage all user accounts and permissions
-          </p>
-        </div>
+    <AdminLayout title="User Management" subtitle="Manage all user accounts and permissions">
 
         {/* Error Message */}
         {error && (
@@ -128,10 +119,10 @@ const handleResetPassword = async (userId, userName) => {
         )}
 
         {/* Table */}
-        <div className="bg-white shadow-md rounded-lg overflow-hidden">
+        <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm sm:text-base divide-y divide-gray-200">
-              <thead className="bg-gray-100 text-xs sm:text-sm">
+              <thead className="bg-blue-50 text-xs sm:text-sm border-b border-gray-200">
                 <tr>
                   <th className="px-3 sm:px-4 py-2 sm:py-3 text-left font-medium text-gray-500 uppercase">User</th>
                   <th className="px-3 sm:px-4 py-2 sm:py-3 text-left font-medium text-gray-500 uppercase">Role</th>
@@ -141,8 +132,14 @@ const handleResetPassword = async (userId, userName) => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50 transition-colors">
+                {users.map((user, index) => (
+                  <motion.tr
+                    key={user.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="hover:bg-gray-50 transition-colors"
+                  >
                     {/* User Info */}
                     <td className="px-3 sm:px-4 py-3 sm:py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -187,7 +184,7 @@ const handleResetPassword = async (userId, userName) => {
                       <div className="flex flex-col space-y-2">
                         <button
                           onClick={() => handleResetPassword(user.id, `${user.first_name} ${user.last_name}`)}
-                          className="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 sm:px-3 sm:py-1.5 rounded transition-colors flex items-center justify-center"
+                          className="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-2 py-1 sm:px-3 sm:py-1.5 rounded transition-colors flex items-center justify-center"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
@@ -205,7 +202,7 @@ const handleResetPassword = async (userId, userName) => {
                         </button>
                       </div>
                     </td>
-                  </tr>
+                  </motion.tr>
                 ))}
               </tbody>
             </table>
@@ -222,7 +219,6 @@ const handleResetPassword = async (userId, userName) => {
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </AdminLayout>
   );
 }

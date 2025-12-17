@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNotification } from "../../../components/NotificationToast";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import AdminLayout from "../../../components/AdminLayout";
 
 // Station configuration
 const STATIONS = [
@@ -27,22 +29,12 @@ export default function StationStatusManagement() {
   const [statuses, setStatuses] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState({});
-  const [adminName, setAdminName] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [dialogData, setDialogData] = useState(null);
   const [statusInput, setStatusInput] = useState("");
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        const user = JSON.parse(storedUser);
-        setAdminName(user.name || "Admin");
-      } catch (err) {
-        console.error("Error parsing stored user:", err);
-      }
-    }
     fetchStatuses();
   }, []);
 
@@ -217,12 +209,6 @@ export default function StationStatusManagement() {
     return `${day} ${month} ${year}, ${hour12}:${minute} ${ampm}`;
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    document.cookie = "adminToken=; path=/; max-age=0";
-    window.location.href = "/admin/login";
-  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -251,25 +237,11 @@ export default function StationStatusManagement() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
-        >
-          <div className="relative">
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-indigo-200 border-t-indigo-600 mx-auto"></div>
-            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-400 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
-          </div>
-          <p className="mt-6 text-gray-600 font-medium">Loading station statuses...</p>
-        </motion.div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading station statuses..." />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 p-4 sm:p-6">
+    <AdminLayout title="Station Status Management" subtitle="Manage manual status for AWS and EWS stations">
       {/* Success Message Toast */}
       <AnimatePresence>
         {successMessage && (
@@ -277,7 +249,7 @@ export default function StationStatusManagement() {
             initial={{ opacity: 0, y: -50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -50 }}
-            className="fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-xl flex items-center gap-3"
+            className="fixed top-20 right-4 z-50 bg-green-500 text-white px-6 py-3 rounded-lg shadow-xl flex items-center gap-3"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -336,7 +308,7 @@ export default function StationStatusManagement() {
                   value={statusInput}
                   onChange={(e) => setStatusInput(e.target.value)}
                   placeholder={`Type "${dialogData.newStatus === "live" ? "Live" : dialogData.newStatus === "offline" ? "Offline" : "Maintenance"}" here`}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800 font-medium"
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800 font-medium"
                   autoFocus
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
@@ -364,7 +336,7 @@ export default function StationStatusManagement() {
                 <button
                   onClick={handleStatusChange}
                   disabled={statusInput.trim() !== (dialogData.newStatus === "live" ? "Live" : dialogData.newStatus === "offline" ? "Offline" : "Maintenance")}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Confirm Change
                 </button>
@@ -374,54 +346,17 @@ export default function StationStatusManagement() {
         )}
       </AnimatePresence>
 
-      {/* Header */}
-      <div className="max-w-7xl mx-auto mb-8">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
-        >
-          <div>
-            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              Station Status Management
-            </h1>
-            <p className="text-gray-600 mt-2 text-sm sm:text-base">Manage manual status for AWS and EWS stations</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center bg-white/90 backdrop-blur-sm rounded-full py-2 px-4 shadow-md border border-gray-200/50">
-              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center mr-2 shadow-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </div>
-              <span className="text-sm font-semibold text-gray-700">Hi, {adminName}</span>
-            </div>
-            <button
-              onClick={() => router.push("/admin")}
-              className="px-5 py-2.5 bg-white hover:bg-gray-50 rounded-lg text-gray-700 font-medium transition-all shadow-md hover:shadow-lg border border-gray-200"
-            >
-              ← Back
-            </button>
-            <button
-              onClick={handleLogout}
-              className="px-5 py-2.5 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg"
-            >
-              Logout
-            </button>
-          </div>
-        </motion.div>
-      </div>
 
       {/* Info Box */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="max-w-7xl mx-auto mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-xl p-5 shadow-lg"
+        className="mb-8 bg-gray-50 border-l-4 border-slate-500 rounded-xl p-5 shadow-sm"
       >
         <div className="flex items-start">
           <div className="flex-shrink-0">
-            <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-full bg-slate-600 flex items-center justify-center">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -460,7 +395,7 @@ export default function StationStatusManagement() {
       </motion.div>
 
       {/* Stations Grid */}
-      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {STATIONS.map((station, index) => {
           const key = `${station.id}_${station.serviceType}`;
           const currentStatus = getCurrentStatus(station.id, station.serviceType);
@@ -473,12 +408,12 @@ export default function StationStatusManagement() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              className="bg-white rounded-2xl shadow-lg p-6 border border-gray-200/50 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
+              className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 hover:shadow-md transition-all duration-300"
             >
               {/* Station Header */}
               <div className="flex items-center justify-between mb-5 pb-4 border-b border-gray-200">
                 <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-2xl shadow-sm">
+                  <div className="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center text-2xl shadow-sm">
                     {station.icon}
                   </div>
                   <div>
@@ -492,7 +427,11 @@ export default function StationStatusManagement() {
                   <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold text-white bg-gradient-to-r ${getStatusColor(currentStatus)} shadow-md`}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold text-white ${
+                      currentStatus === "live" ? "bg-green-600" :
+                      currentStatus === "offline" ? "bg-red-600" :
+                      "bg-yellow-600"
+                    } shadow-sm`}
                   >
                     <span className="mr-1">{getStatusIcon(currentStatus)}</span>
                     {currentStatus === "maintenance" ? "Maintenance" : currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)}
@@ -524,10 +463,10 @@ export default function StationStatusManagement() {
                 <button
                   onClick={() => handleStatusChangeClick(station.id, station.serviceType, "live", station.name)}
                   disabled={isSaving || currentStatus === "live"}
-                  className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-[1.02] ${
+                  className={`w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200 shadow-sm hover:shadow-md ${
                     currentStatus === "live"
-                      ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white cursor-not-allowed"
-                      : "bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 hover:from-green-200 hover:to-emerald-200"
+                      ? "bg-green-600 text-white cursor-not-allowed"
+                      : "bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
                   } ${isSaving ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   {isSaving ? (
@@ -548,10 +487,10 @@ export default function StationStatusManagement() {
                 <button
                   onClick={() => handleStatusChangeClick(station.id, station.serviceType, "offline", station.name)}
                   disabled={isSaving || currentStatus === "offline"}
-                  className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-[1.02] ${
+                  className={`w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200 shadow-sm hover:shadow-md ${
                     currentStatus === "offline"
-                      ? "bg-gradient-to-r from-red-500 to-rose-600 text-white cursor-not-allowed"
-                      : "bg-gradient-to-r from-red-100 to-rose-100 text-red-700 hover:from-red-200 hover:to-rose-200"
+                      ? "bg-red-600 text-white cursor-not-allowed"
+                      : "bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
                   } ${isSaving ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   {isSaving ? (
@@ -572,10 +511,10 @@ export default function StationStatusManagement() {
                 <button
                   onClick={() => handleStatusChangeClick(station.id, station.serviceType, "maintenance", station.name)}
                   disabled={isSaving || currentStatus === "maintenance"}
-                  className={`w-full py-3 px-4 rounded-xl font-semibold transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-[1.02] ${
+                  className={`w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200 shadow-sm hover:shadow-md ${
                     currentStatus === "maintenance"
-                      ? "bg-gradient-to-r from-yellow-500 to-amber-600 text-white cursor-not-allowed"
-                      : "bg-gradient-to-r from-yellow-100 to-amber-100 text-yellow-700 hover:from-yellow-200 hover:to-amber-200"
+                      ? "bg-yellow-600 text-white cursor-not-allowed"
+                      : "bg-yellow-50 text-yellow-700 hover:bg-yellow-100 border border-yellow-200"
                   } ${isSaving ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   {isSaving ? (
@@ -597,7 +536,7 @@ export default function StationStatusManagement() {
                   <button
                     onClick={() => handleRemoveStatus(station.id, station.serviceType)}
                     disabled={isSaving}
-                    className={`w-full py-2.5 px-4 rounded-xl font-medium transition-all duration-200 bg-gray-100 text-gray-700 hover:bg-gray-200 shadow-sm hover:shadow-md ${
+                    className={`w-full py-2.5 px-4 rounded-lg font-medium transition-all duration-200 bg-gray-100 text-gray-700 hover:bg-gray-200 shadow-sm hover:shadow-md ${
                       isSaving ? "opacity-50 cursor-not-allowed" : ""
                     }`}
                   >
@@ -621,6 +560,6 @@ export default function StationStatusManagement() {
           );
         })}
       </div>
-    </div>
+    </AdminLayout>
   );
 }

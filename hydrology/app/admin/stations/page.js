@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react';
+import AdminLayout from '../../../components/AdminLayout';
 
 const StationForm = () => {
   const [formData, setFormData] = useState({
@@ -30,16 +31,16 @@ const StationForm = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-blue-50 to-gray-200 p-4 sm:p-6 flex items-center justify-center">
-      <div className="w-full max-w-4xl mx-auto my-6 sm:my-10 p-6 sm:p-10 bg-white rounded-2xl shadow-lg animate-fade-in-up">
-        
+    <AdminLayout title="Register New Station" subtitle="Expand your network with a new station location">
+      <div className="w-full max-w-4xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="p-6 sm:p-10">
         {/* Stepper Progress Bar */}
 <div className="mb-10 relative">
   {/* Connector Line (background) */}
   <div className="absolute top-4 left-0 w-full h-0.5 bg-gray-300"></div>
   {/* Active Line */}
   <div
-    className="absolute top-4 left-0 h-0.5 bg-blue-500 transition-all duration-500"
+    className="absolute top-4 left-0 h-0.5 bg-blue-600 transition-all duration-500"
     style={{ width: `${(currentStep - 1) / (3 - 1) * 100}%` }}
   ></div>
 
@@ -49,10 +50,10 @@ const StationForm = () => {
       return (
         <div key={label} className="flex flex-col items-center flex-1">
           <div
-            className={`w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-full border-2 
+              className={`w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-full border-2 
               transition-colors duration-300 ${
                 currentStep >= step
-                  ? "bg-blue-500 border-blue-500 text-white"
+                  ? "bg-blue-600 border-blue-600 text-white"
                   : "bg-white border-gray-300 text-gray-400"
               }`}
           >
@@ -68,17 +69,6 @@ const StationForm = () => {
 </div>
 
 
-        {/* Header */}
-        <div className="text-center mb-8 sm:mb-10 relative">
-          <h1 className="text-2xl sm:text-3xl font-semibold text-gray-800 mb-2 tracking-tight">
-            Register New Station
-          </h1>
-          <p className="text-gray-600 text-sm sm:text-lg">
-            Expand your network with a new station location
-          </p>
-          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-12 sm:w-16 h-1 bg-gradient-to-r from-blue-500 to-green-500 rounded-full"></div>
-        </div>
-        
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             
@@ -266,7 +256,7 @@ const StationForm = () => {
             <div className="md:col-span-2">
               <button
                 type="submit"
-                className="w-full bg-gradient-to-r from-blue-500 to-green-500 text-white py-3 sm:py-4 px-4 rounded-xl 
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 sm:py-4 px-4 rounded-xl 
                            shadow-md hover:shadow-lg transform hover:-translate-y-0.5 
                            transition-all duration-300 font-semibold text-base sm:text-lg flex items-center justify-center"
               >
@@ -276,8 +266,9 @@ const StationForm = () => {
 
           </div>
         </form>
+        </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 };
 

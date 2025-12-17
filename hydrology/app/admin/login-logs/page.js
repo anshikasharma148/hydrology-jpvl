@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useNotification } from "../../../components/NotificationToast";
+import LoadingSpinner from "../../../components/LoadingSpinner";
+import AdminLayout from "../../../components/AdminLayout";
 
 // Get backend URL - use localhost if running locally, otherwise use Render
 const getBackendUrl = () => {
@@ -17,7 +19,6 @@ export default function LoginLogsPage() {
   const { showAlert } = useNotification();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [adminName, setAdminName] = useState("");
   const [filters, setFilters] = useState({
     status: '',
     loginType: '',
@@ -30,15 +31,6 @@ export default function LoginLogsPage() {
   });
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      try {
-        const user = JSON.parse(storedUser);
-        setAdminName(user.name || "Admin");
-      } catch (err) {
-        console.error("Error parsing stored user:", err);
-      }
-    }
     fetchLogs();
   }, [filters, pagination.offset]);
 
@@ -81,41 +73,52 @@ export default function LoginLogsPage() {
 
   const formatTimestamp = (ts) => {
     if (!ts) return "--";
-    // MySQL DATETIME format is "YYYY-MM-DD HH:MM:SS" (no timezone)
-    // Treat it as local sensor time (not UTC)
-    let clean = ts;
-    if (typeof ts === 'string') {
-      // Remove "Z" if present (from ISO format)
-      clean = ts.replace("Z", "");
-      // If it's MySQL DATETIME format (YYYY-MM-DD HH:MM:SS), add "T" to make it parseable
-      if (clean.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)) {
-        clean = clean.replace(" ", "T");
+    
+    try {
+      // MySQL DATETIME format is "YYYY-MM-DD HH:MM:SS" (no timezone)
+      // Assume the database stores timestamps in UTC
+      // Convert to IST (UTC+5:30)
+      let dateStr = ts;
+      
+      // Handle MySQL DATETIME format: "YYYY-MM-DD HH:MM:SS"
+      if (typeof ts === 'string' && ts.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)) {
+        // Convert to ISO format and treat as UTC
+        dateStr = ts.replace(" ", "T") + "Z";
+      } else if (typeof ts === 'string' && !ts.includes('Z') && !ts.includes('+') && !ts.includes('-', 10)) {
+        // If it's a date string without timezone, append Z to treat as UTC
+        dateStr = ts.endsWith('Z') ? ts : ts + 'Z';
       }
-    }
-    // Create date as if the timestamp is already local sensor time
-    const d = new Date(clean);
-    if (isNaN(d.getTime())) {
-      console.warn("Failed to parse timestamp:", ts);
+      
+      // Parse as UTC
+      const utcDate = new Date(dateStr);
+      
+      if (isNaN(utcDate.getTime())) {
+        console.warn("Failed to parse timestamp:", ts);
+        return "--";
+      }
+      
+      // Convert UTC to IST (UTC+5:30 = 5.5 hours)
+      const istOffset = 5.5 * 60 * 60 * 1000; // milliseconds
+      const istDate = new Date(utcDate.getTime() + istOffset);
+      
+      // Format in IST
+      const year = istDate.getUTCFullYear();
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = months[istDate.getUTCMonth()];
+      const day = String(istDate.getUTCDate()).padStart(2, "0");
+      let hour = istDate.getUTCHours();
+      const minute = String(istDate.getUTCMinutes()).padStart(2, "0");
+      const second = String(istDate.getUTCSeconds()).padStart(2, "0");
+      const ampm = hour >= 12 ? "PM" : "AM";
+      const hour12 = hour % 12 || 12;
+      
+      return `${day} ${month} ${year}, ${hour12}:${minute}:${second} ${ampm}`;
+    } catch (error) {
+      console.error("Error formatting timestamp:", error);
       return "--";
     }
-    const year = d.getFullYear();
-    const month = d.toLocaleString("en-GB", { month: "short" });
-    const day = String(d.getDate()).padStart(2, "0");
-    let hour = d.getHours();
-    const minute = String(d.getMinutes()).padStart(2, "0");
-    const second = String(d.getSeconds()).padStart(2, "0");
-    const ampm = hour >= 12 ? "PM" : "AM";
-    const hour12 = hour % 12 || 12;
-    
-    return `${day} ${month} ${year}, ${hour12}:${minute}:${second} ${ampm}`;
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    document.cookie = "adminToken=; path=/; max-age=0";
-    window.location.href = "/admin/login";
-  };
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -126,130 +129,131 @@ export default function LoginLogsPage() {
   const currentPage = Math.floor(pagination.offset / pagination.limit) + 1;
 
   if (loading && logs.length === 0) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
-        >
-          <div className="relative">
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-indigo-200 border-t-indigo-600 mx-auto"></div>
-            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-400 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
-          </div>
-          <p className="mt-6 text-gray-600 font-medium">Loading login logs...</p>
-        </motion.div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading login logs..." />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 p-4 sm:p-6">
-      {/* Header */}
-      <div className="max-w-7xl mx-auto mb-8">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
-        >
-          <div>
-            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              Login Logs
-            </h1>
-            <p className="text-gray-600 mt-2 text-sm sm:text-base">View all user login activities and access history</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-full py-2 px-4 shadow-sm border border-gray-200">
-              <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </div>
-              <span className="text-sm font-medium text-gray-700">Hi, {adminName}</span>
-            </div>
-            <button
-              onClick={() => router.push("/admin")}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-medium transition-colors"
-            >
-              Back to Admin
-            </button>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors"
-            >
-              Logout
-            </button>
-          </div>
-        </motion.div>
-      </div>
+    <AdminLayout title="Login Logs" subtitle="View all user login activities and access history">
 
       {/* Filters */}
-      <div className="max-w-7xl mx-auto mb-6">
+      <div className="mb-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-lg p-6 border border-gray-200"
+          className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
         >
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-              <select
-                value={filters.status}
-                onChange={(e) => handleFilterChange('status', e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option value="">All Statuses</option>
-                <option value="success">Success</option>
-                <option value="failed">Failed</option>
-              </select>
+          {/* Filter Header */}
+          <div className="bg-gray-50 border-b border-gray-200 px-6 py-4">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              <h2 className="text-lg font-semibold text-gray-800">Filter Logs</h2>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Login Type</label>
-              <select
-                value={filters.loginType}
-                onChange={(e) => handleFilterChange('loginType', e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option value="">All Types</option>
-                <option value="user">User Login</option>
-                <option value="admin">Admin Login</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-              <input
-                type="text"
-                value={filters.email}
-                onChange={(e) => handleFilterChange('email', e.target.value)}
-                placeholder="Search by email..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              />
-            </div>
-            <div className="flex items-end">
-              <button
-                onClick={() => {
-                  setFilters({ status: '', loginType: '', email: '' });
-                  setPagination(prev => ({ ...prev, offset: 0 }));
-                }}
-                className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
-              >
-                Clear Filters
-              </button>
+          </div>
+
+          {/* Filter Controls */}
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {/* Status Filter */}
+              <div>
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Status
+                </label>
+                <div className="relative">
+                  <select
+                    value={filters.status}
+                    onChange={(e) => handleFilterChange('status', e.target.value)}
+                    className="w-full px-4 py-2.5 pl-10 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none cursor-pointer hover:border-gray-400"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="success">Success</option>
+                    <option value="failed">Failed</option>
+                  </select>
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Login Type Filter */}
+              <div>
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Login Type
+                </label>
+                <div className="relative">
+                  <select
+                    value={filters.loginType}
+                    onChange={(e) => handleFilterChange('loginType', e.target.value)}
+                    className="w-full px-4 py-2.5 pl-10 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none cursor-pointer hover:border-gray-400"
+                  >
+                    <option value="">All Types</option>
+                    <option value="user">User Login</option>
+                    <option value="admin">Admin Login</option>
+                  </select>
+                  <div className="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Email Filter */}
+              <div>
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Email
+                </label>
+                <input
+                  type="text"
+                  value={filters.email}
+                  onChange={(e) => handleFilterChange('email', e.target.value)}
+                  placeholder="Search by email..."
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-gray-400"
+                />
+              </div>
+
+              {/* Clear Filters Button */}
+              <div className="flex items-end">
+                <button
+                  onClick={() => {
+                    setFilters({ status: '', loginType: '', email: '' });
+                    setPagination(prev => ({ ...prev, offset: 0 }));
+                  }}
+                  className="w-full px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-all flex items-center justify-center gap-2 border border-gray-300 hover:border-gray-400 shadow-sm hover:shadow"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Clear Filters
+                </button>
+              </div>
             </div>
           </div>
         </motion.div>
       </div>
 
       {/* Logs Table */}
-      <div className="max-w-7xl mx-auto">
+      <div>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden"
+          className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
         >
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+              <thead className="bg-blue-600 text-white">
                 <tr>
                   <th className="px-6 py-4 text-left text-sm font-semibold">Timestamp</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold">Name</th>
@@ -359,7 +363,7 @@ export default function LoginLogsPage() {
           )}
         </motion.div>
       </div>
-    </div>
+    </AdminLayout>
   );
 }
 
