@@ -46,7 +46,8 @@ export default function UserManagement() {
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(
-        `http://115.242.156.230:5000/api/users/admin/users/${userId}/reset-password`,
+        `https://hydrology-jpvl.onrender.com/api/users/admin/users/${userId}/reset-password`
+,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
@@ -67,7 +68,8 @@ export default function UserManagement() {
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(
-        `http://115.242.156.230:5000/api/users/admin/users/${userId}`,
+        `https://hydrology-jpvl.onrender.com/api/users/admin/users/${userId}`
+,
         { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } }
       );
       if (!res.ok) throw new Error("Failed to delete user");
