@@ -136,7 +136,7 @@ export default function Login() {
     }
 
     setIsLoading(true);
-    
+
     // Get user's location from browser
     let userLocation = null;
     let userLocationString = null;
@@ -188,15 +188,15 @@ export default function Login() {
           try {
             const backendUrl = getBackendUrl();
             res = await fetch(`${backendUrl}/api/users/login`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                email: formData.email,
-                password: formData.password,
-                role: formData.role,
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+            role: formData.role,
                 userLocation: userLocation, // Send browser geolocation if available
-              }),
-            });
+          }),
+        });
 
             data = await res.json();
             if (res.ok) break; // Success, exit retry loop

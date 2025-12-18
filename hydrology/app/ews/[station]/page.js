@@ -191,7 +191,7 @@ export default function StationPage() {
   // Get station status
   const statusInfo = getStationStatus(stationId, "EWS", latestData?.timestamp, 20);
   const isMaintenance = statusInfo.status === "maintenance";
-  
+
   // Helper function to format values
   const formatValue = (v, fixed = 2) => {
     if (isMaintenance) return "NIL";

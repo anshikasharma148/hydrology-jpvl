@@ -6,18 +6,56 @@ import { useEffect, useState } from 'react';
 export default function AdminLayout({ children, title, subtitle, showBackButton = true }) {
   const router = useRouter();
   const [adminName, setAdminName] = useState("");
+  const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
+    // Check authentication - allow access if user is admin with valid token
+    const token = localStorage.getItem("token");
     const storedUser = localStorage.getItem("user");
+    
+    if (!token) {
+      // No token, redirect to admin login
+      router.push("/admin/login");
+      return;
+    }
+
     if (storedUser) {
       try {
         const user = JSON.parse(storedUser);
-        setAdminName(user.name || "Admin");
+        const userRole = user.role?.toLowerCase();
+        
+        // Check if user is admin
+        if (userRole !== "admin") {
+          // Not an admin, redirect to admin login
+          router.push("/admin/login");
+          return;
+        }
+        
+        // User is admin, set admin name
+        setAdminName(user.name || user.first_name || "Admin");
+        
+        // Set adminToken cookie if it doesn't exist (for compatibility)
+        // This ensures admin pages work whether user logged in via regular or admin login
+        const adminTokenCookie = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('adminToken='));
+        
+        if (!adminTokenCookie && token) {
+          document.cookie = `adminToken=${token}; path=/;`;
+        }
       } catch (err) {
         console.error("Error parsing stored user:", err);
+        router.push("/admin/login");
+        return;
       }
+    } else {
+      // No user data, redirect to admin login
+      router.push("/admin/login");
+      return;
     }
-  }, []);
+    
+    setIsChecking(false);
+  }, [router]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -25,6 +63,18 @@ export default function AdminLayout({ children, title, subtitle, showBackButton 
     document.cookie = "adminToken=; path=/; max-age=0";
     window.location.href = "/admin/login";
   };
+
+  // Show loading state while checking authentication
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

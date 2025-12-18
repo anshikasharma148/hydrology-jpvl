@@ -21,7 +21,7 @@ const ReportsDashboard = () => {
     slug: station.station_name.toLowerCase().replace(/\s+/g, '_').replace(/[()]/g, ''),
     stationId: station.StationID
   }));
-  
+
   const ewsStations = ewsStationsData.map(station => ({
     name: station.station_name,
     slug: station.station_name.toLowerCase().replace(/\s+/g, '_').replace(/[()]/g, ''),
@@ -134,7 +134,7 @@ const ReportsDashboard = () => {
           // Find station name from slug
           const stationInfo = awsStations.find(s => s.slug === selectedStation);
           let stationKey = stationInfo ? stationInfo.name : (selectedStation.toLowerCase().includes("mana") ? "Mana" : "Lambagad");
-          
+
           // Handle Barrage/Lambagad mapping - API returns "Lambagad"
           if (stationKey === "Barrage") {
             stationKey = "Lambagad";
@@ -176,7 +176,7 @@ const ReportsDashboard = () => {
           // Find station name from slug
           const stationInfo = ewsStations.find(s => s.slug === selectedStation);
           let stationKey = stationInfo ? stationInfo.name : (selectedStation.toLowerCase().includes("mana") ? "Mana" : "Vasudhara");
-          
+
           // Try to find the data with the station key
           let stationData = result.data?.[stationKey];
           if (!stationData) {
@@ -765,9 +765,9 @@ const ReportsDashboard = () => {
                             return value;
                           })();
                           return (
-                            <td key={i} className="px-4 sm:px-6 py-3 sm:py-4 whitespace-normal sm:whitespace-nowrap text-sm font-medium text-gray-700">
+                          <td key={i} className="px-4 sm:px-6 py-3 sm:py-4 whitespace-normal sm:whitespace-nowrap text-sm font-medium text-gray-700">
                               {displayValue}
-                            </td>
+                          </td>
                           );
                         })}
                       </tr>

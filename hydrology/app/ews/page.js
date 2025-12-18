@@ -201,9 +201,9 @@ export default function EWSPage() {
     const stationId = STATION_ID_MAP[stationName];
     if (!stationId) {
       // Fallback to old logic if station not in map
-      if (!ts) return true;
-      const diffMin = (Date.now() - new Date(ts).getTime()) / 60000;
-      return diffMin > 20;
+    if (!ts) return true;
+    const diffMin = (Date.now() - new Date(ts).getTime()) / 60000;
+    return diffMin > 20;
     }
     const statusInfo = getStationStatus(stationId, "EWS", ts, 20);
     return statusInfo.status !== "live";
@@ -356,48 +356,48 @@ export default function EWSPage() {
                 <div className="space-y-1.5 sm:space-y-2 md:space-y-3">
                   {/* Water Discharge - only if selected */}
                   {selectedFields.includes('water_discharge') && (
-                    <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
-                      status === "alert" || status === "warning"
-                        ? isDarkMode ? "bg-red-500/20 border border-red-500/40" : "bg-red-100/70 border border-red-300"
-                        : isDarkMode ? "bg-green-500/20 border border-green-500/40" : "bg-green-100/70 border border-green-300"
-                    }`}>
-                      <span className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
-                        <Droplets size={10} className={`sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 flex-shrink-0 ${
-                          status === "alert" || status === "warning" ? "text-red-400" : "text-green-400"
-                        }`} /> 
-                        <span className="truncate font-semibold">Discharge</span>
-                      </span>
-                      <span className={`font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0 font-semibold ${
+                  <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
+                    status === "alert" || status === "warning"
+                      ? isDarkMode ? "bg-red-500/20 border border-red-500/40" : "bg-red-100/70 border border-red-300"
+                      : isDarkMode ? "bg-green-500/20 border border-green-500/40" : "bg-green-100/70 border border-green-300"
+                  }`}>
+                    <span className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
+                      <Droplets size={10} className={`sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 flex-shrink-0 ${
                         status === "alert" || status === "warning" ? "text-red-400" : "text-green-400"
+                      }`} /> 
+                      <span className="truncate font-semibold">Discharge</span>
+                    </span>
+                    <span className={`font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0 font-semibold ${
+                      status === "alert" || status === "warning" ? "text-red-400" : "text-green-400"
                       }`}>{safeNum(item?.water_discharge, 2, isMaintenance)} {isMaintenance ? "" : "m³/s"}</span>
-                    </div>
+                  </div>
                   )}
 
                   {/* Water Level - only if selected */}
                   {selectedFields.includes('water_level') && (
-                    <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
-                      isDarkMode ? "bg-slate-800/30" : "bg-blue-100/50"
-                    }`}>
-                      <span className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
-                        <Waves size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" /> 
-                        <span className="truncate">Level</span>
-                      </span>
+                  <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
+                    isDarkMode ? "bg-slate-800/30" : "bg-blue-100/50"
+                  }`}>
+                    <span className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
+                      <Waves size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" /> 
+                      <span className="truncate">Level</span>
+                    </span>
                       <span className="font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0">{safeNum(item?.water_level, 2, isMaintenance)} {isMaintenance ? "" : "m"}</span>
-                    </div>
+                  </div>
                   )}
 
                   {/* Surface Velocity - only if selected */}
                   {selectedFields.includes('surface_velocity') && (
-                    <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
-                      isDarkMode ? "bg-slate-800/30" : "bg-blue-100/50"
-                    }`}>
-                      <span className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
-                        <Activity size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" />
-                        <span className="truncate">Velocity</span>
-                      </span>
-                      <span className="font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0">
+                  <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
+                    isDarkMode ? "bg-slate-800/30" : "bg-blue-100/50"
+                  }`}>
+                    <span className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
+                      <Activity size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" />
+                      <span className="truncate">Velocity</span>
+                    </span>
+                    <span className="font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0">
                         {safeNum(item?.surface_velocity, 2, isMaintenance)} {isMaintenance ? "" : "m/s"}
-                      </span>
+</span>
                     </div>
                   )}
 
@@ -413,63 +413,63 @@ export default function EWSPage() {
                       <span className="font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0">
                         {safeNum(item?.avg_surface_velocity, 2, isMaintenance)} {isMaintenance ? "" : "m/s"}
                       </span>
-                    </div>
+                  </div>
                   )}
 
                   {/* Water Distance Sensor - only if selected */}
                   {selectedFields.includes('water_dist_sensor') && (
-                    <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
-                      isDarkMode ? "bg-slate-800/30" : "bg-blue-100/50"
-                    }`}>
-                      <span className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
-                        <Ruler size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" />
-                        <span className="truncate">Water Distance from Sensor</span>
-                      </span>
+                  <div className={`p-2 sm:p-2.5 md:p-3 rounded-md sm:rounded-lg flex justify-between items-center gap-1 ${
+                    isDarkMode ? "bg-slate-800/30" : "bg-blue-100/50"
+                  }`}>
+                    <span className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm">
+                      <Ruler size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-blue-400 flex-shrink-0" />
+                      <span className="truncate">Water Distance from Sensor</span>
+                    </span>
                       <span className="font-mono text-[10px] sm:text-xs md:text-sm flex-shrink-0">{safeNum(item?.water_dist_sensor, 2, isMaintenance)} {isMaintenance ? "" : "m"}</span>
-                    </div>
+                  </div>
                   )}
                 </div>
 
                 {/* Device Data Section - only show if at least one device field is selected */}
                 {(selectedFields.includes('tilt_angle') || selectedFields.includes('flow_direction') || selectedFields.includes('SNR')) && (
-                  <div className="border-t mt-2 sm:mt-3 md:mt-4 pt-2 sm:pt-3 md:pt-4 space-y-1.5 sm:space-y-2 md:space-y-3">
-                    <p className="text-[10px] sm:text-xs md:text-sm font-bold uppercase tracking-wider text-blue-400">Device Data</p>
+                <div className="border-t mt-2 sm:mt-3 md:mt-4 pt-2 sm:pt-3 md:pt-4 space-y-1.5 sm:space-y-2 md:space-y-3">
+                  <p className="text-[10px] sm:text-xs md:text-sm font-bold uppercase tracking-wider text-blue-400">Device Data</p>
 
                     {selectedFields.includes('tilt_angle') && (
-                      <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
-                        <span className="flex items-center gap-1 sm:gap-2 truncate">
-                          <Compass size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-yellow-400 flex-shrink-0" /> 
-                          <span className="truncate">Tilt Angle</span>
-                        </span>
-                        <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                  <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
+                    <span className="flex items-center gap-1 sm:gap-2 truncate">
+                      <Compass size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-yellow-400 flex-shrink-0" /> 
+                      <span className="truncate">Tilt Angle</span>
+                    </span>
+                    <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
                           {safeNum(item?.tilt_angle, 1, isMaintenance)} {isMaintenance ? "" : "°"}
-                        </span>
-                      </div>
+                    </span>
+                  </div>
                     )}
 
                     {selectedFields.includes('flow_direction') && (
-                      <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
-                        <span className="flex items-center gap-1 sm:gap-2 truncate">
-                          <Compass size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-green-500 flex-shrink-0" /> 
-                          <span className="truncate">Flow Dir</span>
-                        </span>
-                        <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                  <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
+                    <span className="flex items-center gap-1 sm:gap-2 truncate">
+                      <Compass size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-green-500 flex-shrink-0" /> 
+                      <span className="truncate">Flow Dir</span>
+                    </span>
+                    <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
                           {isMaintenance ? "NIL" : formatFlowDirection(item?.flow_direction)}
-                        </span>
-                      </div>
+                    </span>
+                  </div>
                     )}
 
                     {selectedFields.includes('SNR') && (
-                      <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
-                        <span className="flex items-center gap-1 sm:gap-2 truncate">
-                          <Gauge size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-purple-400 flex-shrink-0" /> 
-                          <span className="truncate">SNR</span>
-                        </span>
-                        <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
+                    <div className="flex justify-between text-[10px] sm:text-xs md:text-sm gap-1">
+                      <span className="flex items-center gap-1 sm:gap-2 truncate">
+                        <Gauge size={10} className="sm:w-3 sm:h-3 md:w-3.5 md:h-3.5 text-purple-400 flex-shrink-0" /> 
+                        <span className="truncate">SNR</span>
+                      </span>
+                      <span className={`font-mono flex-shrink-0 ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
                           {safeNum(item?.SNR, 2, isMaintenance)} {isMaintenance ? "" : "dB"}
-                        </span>
-                      </div>
-                    )}
+                      </span>
+                    </div>
+                  )}
                   </div>
                 )}
 
@@ -538,8 +538,8 @@ export default function EWSPage() {
                           {safeNum(item?.solar_panel_tracking, 1, isMaintenance)} {isMaintenance ? "" : "V"}
                         </span>
                       </div>
-                    )}
-                  </div>
+                  )}
+                </div>
                 )}
 
               </div>

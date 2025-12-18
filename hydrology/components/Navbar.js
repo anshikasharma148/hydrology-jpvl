@@ -209,6 +209,9 @@ export default function Navbar() {
     }
   }, []);
 
+  // Check if user is admin
+  const isAdmin = user?.role === "Admin" || user?.role === "admin";
+
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
@@ -474,6 +477,32 @@ export default function Navbar() {
           <span className="font-semibold text-blue-700">{fullName}</span>
         </div>
 
+        {/* Admin Panel Toggle Button (Desktop) - Only show for admins */}
+        {isAdmin && (
+          <button
+            onClick={() => {
+              // Ensure adminToken cookie is set for admin pages
+              const token = localStorage.getItem("token");
+              if (token) {
+                document.cookie = `adminToken=${token}; path=/;`;
+              }
+              router.push("/admin");
+            }}
+            className="hidden md:flex items-center space-x-2 px-4 py-2 
+               text-white 
+               bg-purple-600/80 
+               border border-purple-600 
+               backdrop-blur-sm 
+               rounded-md 
+               transition-all duration-300 
+               hover:bg-purple-700 hover:shadow-lg hover:shadow-purple-500/40"
+            title="Switch to Admin Panel"
+          >
+            <Settings size={18} />
+            <span>Admin Panel</span>
+          </button>
+        )}
+
         {/* Logout Button (Desktop) */}
         <button
           onClick={handleLogout}
@@ -539,6 +568,25 @@ export default function Navbar() {
                 <Settings size={20} className="mr-3" />
                 Settings
               </Link>
+
+              {/* Admin Panel Toggle Button (Mobile) - Only show for admins */}
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    // Ensure adminToken cookie is set for admin pages
+                    const token = localStorage.getItem("token");
+                    if (token) {
+                      document.cookie = `adminToken=${token}; path=/;`;
+                    }
+                    router.push("/admin");
+                    setMenuOpen(false);
+                  }}
+                  className="flex items-center px-4 py-3 text-base text-gray-700 hover:bg-gray-100 w-full"
+                >
+                  <Settings size={20} className="mr-3" />
+                  Admin Panel
+                </button>
+              )}
 
               <div className="flex justify-center mt-4">
                 <button

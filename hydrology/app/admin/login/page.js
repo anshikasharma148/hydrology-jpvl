@@ -182,13 +182,13 @@ export default function AdminLogin() {
         try {
           const backendUrl = getBackendUrl();
           res = await fetch(`${backendUrl}/api/users/admin-login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               ...adminData,
               userLocation: userLocation, // Send browser geolocation if available
             }),
-          });
+      });
           data = await res.json();
           if (res.ok) break; // Success, exit retry loop
           

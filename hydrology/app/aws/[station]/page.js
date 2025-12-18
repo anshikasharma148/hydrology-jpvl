@@ -103,12 +103,12 @@ const CustomTooltip = ({ active, payload, label }) => {
               const clean = data.rawTimestamp ? data.rawTimestamp.replace("Z", "") : null;
               const d = clean ? new Date(clean) : new Date();
               return d.toLocaleString('en-IN', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: true,
-                day: '2-digit',
-                month: 'short',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: true,
+              day: '2-digit',
+              month: 'short',
               });
             })()}
           </p>
@@ -245,20 +245,20 @@ export default function StationPage() {
           const date = clean ? new Date(clean) : new Date();
           return {
             time: date.toLocaleTimeString('en-US', {
-              hour: '2-digit',
-              minute: '2-digit',
-              hour12: true,
-            }),
-            rawTimestamp: d.timestamp,
-            Temperature: parseFloat(d.temperature) || 0,
-            Pressure: parseFloat(d.pressure) || 0,
-            Humidity: parseFloat(d.relative_humidity) || 0,
-            Rain: parseFloat(d.rain) || 0,
-            Precipitation: parseFloat(d.precipitation) || 0,
-            'Solar Radiation': parseFloat(d.PIR) || 0,
-            'Avg Solar Radiation': parseFloat(d.avg_PIR) || 0,
-            Wind: parseFloat(d.windspeed) || 0,
-            'Bucket Weight': parseFloat(d.bucket_weight) || 0,
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          }),
+          rawTimestamp: d.timestamp,
+          Temperature: parseFloat(d.temperature) || 0,
+          Pressure: parseFloat(d.pressure) || 0,
+          Humidity: parseFloat(d.relative_humidity) || 0,
+          Rain: parseFloat(d.rain) || 0,
+          Precipitation: parseFloat(d.precipitation) || 0,
+          'Solar Radiation': parseFloat(d.PIR) || 0,
+          'Avg Solar Radiation': parseFloat(d.avg_PIR) || 0,
+          Wind: parseFloat(d.windspeed) || 0,
+          'Bucket Weight': parseFloat(d.bucket_weight) || 0,
           };
         });
 
@@ -371,7 +371,7 @@ export default function StationPage() {
             </h1>
 
             <div className="flex items-center gap-3 flex-wrap">
-              <div className="text-base md:text-xl text-gray-700 font-semibold">{stateName}</div>
+            <div className="text-base md:text-xl text-gray-700 font-semibold">{stateName}</div>
               {/* Status Badge */}
               {statusInfo.status === "maintenance" && (
                 <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold border border-yellow-300">

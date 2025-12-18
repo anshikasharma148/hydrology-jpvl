@@ -160,7 +160,7 @@ const getPIRIcon = () => <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600" 
     };
   };
 
-  const getWindIcon = (speed) =>
+const getWindIcon = (speed) =>
   speed > 8 ? (
     <Wind className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
   ) : speed > 4 ? (
@@ -322,25 +322,25 @@ export default function AwsPage() {
         // Always add station, even if no data (will show as offline)
         if (stationData?.length > 0) {
           const d = stationData[0];
-          s.push({
+        s.push({
             name: slug,
             displayName: stationName,
-            temperature: Number(d.temperature || 0).toFixed(1),
-            pressure: Number(d.pressure || 0).toFixed(1),
-            humidity: Number(d.relative_humidity || 0).toFixed(1),
-            rain: Number(d.rain || 0).toFixed(1),
-            precipitation: Number(d.precipitation || 0).toFixed(1),
-            bucket_weight: Number(d.bucket_weight || 0).toFixed(1),
-            PIR: Number(d.PIR || 0).toFixed(1),
-            avg_PIR: Number(d.avg_PIR || 0).toFixed(1),
-            wind_speed: Number(d.windspeed || 0).toFixed(1),
-            wind_direction: Number(d.winddirection || 0).toFixed(1),
-            lastUpdate: d.timestamp || new Date().toISOString(),
+          temperature: Number(d.temperature || 0).toFixed(1),
+          pressure: Number(d.pressure || 0).toFixed(1),
+          humidity: Number(d.relative_humidity || 0).toFixed(1),
+          rain: Number(d.rain || 0).toFixed(1),
+          precipitation: Number(d.precipitation || 0).toFixed(1),
+          bucket_weight: Number(d.bucket_weight || 0).toFixed(1),
+          PIR: Number(d.PIR || 0).toFixed(1),
+          avg_PIR: Number(d.avg_PIR || 0).toFixed(1),
+          wind_speed: Number(d.windspeed || 0).toFixed(1),
+          wind_direction: Number(d.winddirection || 0).toFixed(1),
+          lastUpdate: d.timestamp || new Date().toISOString(),
             selectedFields: station.selected_fields || [],
-          });
+        });
         } else {
           // Add station with null data (will show as offline)
-          s.push({
+        s.push({
             name: slug,
             displayName: stationName,
             temperature: null,
@@ -355,8 +355,8 @@ export default function AwsPage() {
             wind_direction: null,
             lastUpdate: null,
             selectedFields: station.selected_fields || [],
-          });
-        }
+        });
+      }
       });
 
       setStations(s);
@@ -533,11 +533,11 @@ export default function AwsPage() {
                       <div className="absolute inset-0 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-500 animate-ping opacity-75"></div>
                     )}
                   <div
-                    className={`relative w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shadow-lg ${
+                      className={`relative w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full shadow-lg ${
                       isMaintenance
                         ? "bg-yellow-500 shadow-yellow-500/50"
                         : isLive
-                        ? "bg-green-500 shadow-green-500/50"
+                          ? "bg-green-500 shadow-green-500/50"
                         : "bg-red-500 shadow-red-500/50"
                     }`}
                   />
@@ -562,16 +562,16 @@ export default function AwsPage() {
                     </div>
 
                     {(!selectedFields.length || selectedFields.includes('temperature')) && (
-                      <div
-                        className={`flex items-center bg-gradient-to-r ${currentTheme.temperatureBg} rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 border-2 ${currentTheme.temperatureBorder} shadow-lg group-hover:shadow-xl transition-all duration-300 flex-shrink-0 group-hover:scale-105`}
-                      >
-                        <div className="group-hover:rotate-12 transition-transform duration-300">
-                        {getTemperatureIcon(parseFloat(station.temperature))}
-                        </div>
-                        <span className="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-800 ml-1 sm:ml-1.5">
-                          {station.temperature || '-'}°C
-                        </span>
+                    <div
+                      className={`flex items-center bg-gradient-to-r ${currentTheme.temperatureBg} rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 border-2 ${currentTheme.temperatureBorder} shadow-lg group-hover:shadow-xl transition-all duration-300 flex-shrink-0 group-hover:scale-105`}
+                    >
+                      <div className="group-hover:rotate-12 transition-transform duration-300">
+                      {getTemperatureIcon(parseFloat(station.temperature))}
                       </div>
+                      <span className="text-xl sm:text-2xl md:text-3xl font-extrabold text-slate-800 ml-1 sm:ml-1.5">
+                          {station.temperature || '-'}°C
+                      </span>
+                    </div>
                     )}
                   </div>
 
@@ -583,8 +583,8 @@ export default function AwsPage() {
                     {(() => {
                       const filteredParams = getFilteredParams(selectedFields, station);
                       return filteredParams.atmospheric.length > 0 && (
-                        <div className="space-y-0.5 sm:space-y-1">
-                          <h4 className="text-xs sm:text-sm font-bold text-blue-600 uppercase tracking-wide mb-0.5 px-1 text-center">Atmospheric</h4>
+                    <div className="space-y-0.5 sm:space-y-1">
+                      <h4 className="text-xs sm:text-sm font-bold text-blue-600 uppercase tracking-wide mb-0.5 px-1 text-center">Atmospheric</h4>
                           {filteredParams.atmospheric.map((item, idx) => (
                         <div
                           key={idx}
@@ -602,8 +602,8 @@ export default function AwsPage() {
                             {item.value} {item.unit}
                           </span>
                         </div>
-                          ))}
-                        </div>
+                      ))}
+                    </div>
                       );
                     })()}
 
@@ -611,8 +611,8 @@ export default function AwsPage() {
                     {(() => {
                       const filteredParams = getFilteredParams(selectedFields, station);
                       return filteredParams.precipitation.length > 0 && (
-                        <div className="space-y-0.5 sm:space-y-1">
-                          <h4 className="text-xs sm:text-sm font-bold text-cyan-600 uppercase tracking-wide mb-0.5 px-1 text-center">Precipitation</h4>
+                    <div className="space-y-0.5 sm:space-y-1">
+                      <h4 className="text-xs sm:text-sm font-bold text-cyan-600 uppercase tracking-wide mb-0.5 px-1 text-center">Precipitation</h4>
                           {filteredParams.precipitation.map((item, idx) => (
                         <div
                           key={idx}
@@ -630,8 +630,8 @@ export default function AwsPage() {
                             {item.value} {item.unit}
                           </span>
                         </div>
-                          ))}
-                        </div>
+                      ))}
+                    </div>
                       );
                     })()}
 
@@ -639,8 +639,8 @@ export default function AwsPage() {
                     {(() => {
                       const filteredParams = getFilteredParams(selectedFields, station);
                       return filteredParams.solar.length > 0 && (
-                        <div className="space-y-0.5 sm:space-y-1">
-                          <h4 className="text-xs sm:text-sm font-bold text-amber-600 uppercase tracking-wide mb-0.5 px-1 text-center">Solar Energy</h4>
+                    <div className="space-y-0.5 sm:space-y-1">
+                      <h4 className="text-xs sm:text-sm font-bold text-amber-600 uppercase tracking-wide mb-0.5 px-1 text-center">Solar Energy</h4>
                           {filteredParams.solar.map((item, idx) => (
                       <div
                         key={idx}
@@ -658,8 +658,8 @@ export default function AwsPage() {
                           {item.value} {item.unit}
                         </span>
                       </div>
-                          ))}
-                        </div>
+                    ))}
+                    </div>
                       );
                     })()}
 
@@ -667,8 +667,8 @@ export default function AwsPage() {
                     {(() => {
                       const filteredParams = getFilteredParams(selectedFields, station);
                       return filteredParams.wind.length > 0 && (
-                        <div className="space-y-0.5 sm:space-y-1">
-                          <h4 className="text-xs sm:text-sm font-bold text-indigo-600 uppercase tracking-wide mb-0.5 px-1 text-center">Wind</h4>
+                    <div className="space-y-0.5 sm:space-y-1">
+                      <h4 className="text-xs sm:text-sm font-bold text-indigo-600 uppercase tracking-wide mb-0.5 px-1 text-center">Wind</h4>
                           {filteredParams.wind.map((item, idx) => (
                         <div
                           key={idx}
@@ -686,15 +686,15 @@ export default function AwsPage() {
                             {item.value} {item.unit}
                           </span>
                         </div>
-                          ))}
-                        </div>
+                      ))}
+                    </div>
                       );
                     })()}
                   </div>
 
                   {/* Wind Direction Compass - Only show if winddirection is selected */}
                   {(!selectedFields.length || (selectedFields.includes('windspeed') || selectedFields.includes('winddirection'))) && (
-                    <div className="flex flex-col items-center p-2 sm:p-3 bg-gradient-to-br from-blue-100 via-indigo-100 to-purple-100 rounded-xl sm:rounded-2xl border-2 border-blue-300/60 shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-[1.02]">
+                  <div className="flex flex-col items-center p-2 sm:p-3 bg-gradient-to-br from-blue-100 via-indigo-100 to-purple-100 rounded-xl sm:rounded-2xl border-2 border-blue-300/60 shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-[1.02]">
                     <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
                       <div className="p-1.5 sm:p-2 bg-white/80 rounded-lg shadow-sm">
                       {getWindIcon(station.wind_speed)}
@@ -753,7 +753,7 @@ export default function AwsPage() {
                         </div>
                       </div>
                     </div>
-                    </div>
+                  </div>
                   )}
                 </div>
 

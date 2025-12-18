@@ -424,7 +424,7 @@ export default function ParameterGraphs() {
             const stats = stationNames.map((station) => {
               const stationStats = calculateStats(data, param.name, station);
               return {
-                station,
+              station,
                 ...stationStats,
               };
             });

@@ -49,7 +49,7 @@ export default function Dashboard() {
   // changed to hold multiple EWS stations - now dynamic
   const [ewsLatest, setEwsLatest] = useState({});
   const [isDarkTheme, setIsDarkTheme] = useState(false);
-  
+
   // Station status hook for manual status management
   const { getStationStatus } = useStationStatus();
   
@@ -277,8 +277,8 @@ export default function Dashboard() {
           } else {
             // Fallback to checking common fields if no selectedFields
             candidate = arr.find((r) =>
-              [r.water_level, r.avg_surface_velocity, r.surface_velocity, r.water_dist_sensor, r.water_discharge, r.tilt_angle, r.flow_direction]
-                .some((x) => x !== null && x !== undefined && x !== "")
+          [r.water_level, r.avg_surface_velocity, r.surface_velocity, r.water_dist_sensor, r.water_discharge, r.tilt_angle, r.flow_direction]
+            .some((x) => x !== null && x !== undefined && x !== "")
             ) || latestRecord;
           }
 
@@ -292,25 +292,25 @@ export default function Dashboard() {
           };
 
           ewsData[stationName] = {
-            StationID: candidate.StationID ?? null,
-            DeviceID: candidate.DeviceID ?? null,
-            surface_velocity: safeParse(candidate.surface_velocity),
-            avg_surface_velocity: safeParse(candidate.avg_surface_velocity),
-            water_dist_sensor: safeParse(candidate.water_dist_sensor),
-            water_level: safeParse(candidate.water_level),
-            water_discharge: safeParse(candidate.water_discharge),
-            tilt_angle: safeParse(candidate.tilt_angle),
-            flow_direction: safeParse(candidate.flow_direction),
+          StationID: candidate.StationID ?? null,
+          DeviceID: candidate.DeviceID ?? null,
+          surface_velocity: safeParse(candidate.surface_velocity),
+          avg_surface_velocity: safeParse(candidate.avg_surface_velocity),
+          water_dist_sensor: safeParse(candidate.water_dist_sensor),
+          water_level: safeParse(candidate.water_level),
+          water_discharge: safeParse(candidate.water_discharge),
+          tilt_angle: safeParse(candidate.tilt_angle),
+          flow_direction: safeParse(candidate.flow_direction),
             SNR: safeParse(candidate.SNR),
-            internal_temperature: safeParse(candidate.internal_temperature),
-            charge_current: safeParse(candidate.charge_current),
+          internal_temperature: safeParse(candidate.internal_temperature),
+          charge_current: safeParse(candidate.charge_current),
             absorbed_current: safeParse(candidate.observed_current ?? candidate.absorbed_current),
-            battery_voltage: safeParse(candidate.battery_voltage),
-            solar_panel_tracking: safeParse(candidate.solar_panel_tracking),
+          battery_voltage: safeParse(candidate.battery_voltage),
+          solar_panel_tracking: safeParse(candidate.solar_panel_tracking),
             timestamp: fixTimestamp(candidate.timestamp) ?? fixTimestamp(latestRecord.timestamp),
-            UID: candidate.UID ?? null,
-            raw: candidate,
-          };
+          UID: candidate.UID ?? null,
+          raw: candidate,
+        };
         } else {
           // If no data, create empty data object with null timestamp to show card as Offline
           ewsData[stationName] = {
@@ -332,7 +332,7 @@ export default function Dashboard() {
             timestamp: null,
             UID: null,
             raw: null,
-          };
+};
         }
       });
 
@@ -649,15 +649,15 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
   const activeCount = React.useMemo(() => {
     return stationsToShow.reduce((acc, st) => {
       const rec = ewsLatest?.[st.key];
-      if (rec && rec.timestamp) {
-        const parsed = Date.parse(rec.timestamp);
-        if (!isNaN(parsed)) {
-          const diffMin = (Date.now() - parsed) / (1000 * 60);
-          if (diffMin <= 20) acc += 1;
-        }
+    if (rec && rec.timestamp) {
+      const parsed = Date.parse(rec.timestamp);
+      if (!isNaN(parsed)) {
+        const diffMin = (Date.now() - parsed) / (1000 * 60);
+        if (diffMin <= 20) acc += 1;
       }
-      return acc;
-    }, 0);
+    }
+    return acc;
+  }, 0);
   }, [stationsToShow, ewsLatest]);
 
   return (
@@ -748,146 +748,146 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
                   {/* SURFACE / FLOW SECTION - only show if at least one field is selected */}
                   {(selectedFields.includes('surface_velocity') || selectedFields.includes('avg_surface_velocity') || 
                     selectedFields.includes('SNR') || selectedFields.includes('water_discharge')) && (
-                    <div
-                      className={`p-3 rounded-xl border mb-3 ${
-                        isDarkTheme
-                          ? "bg-[#0f2a59]/70 border-[#1f4fa8]/30 text-slate-100"
-                          : "bg-white border-gray-100"
-                      }`}
-                    >
-                      <p className={`text-xs mb-2 ${isDarkTheme ? "text-amber-200" : "text-amber-600"}`}>
-                        Surface / Flow
-                      </p>
+                  <div
+                    className={`p-3 rounded-xl border mb-3 ${
+                      isDarkTheme
+                        ? "bg-[#0f2a59]/70 border-[#1f4fa8]/30 text-slate-100"
+                        : "bg-white border-gray-100"
+                    }`}
+                  >
+                    <p className={`text-xs mb-2 ${isDarkTheme ? "text-amber-200" : "text-amber-600"}`}>
+                      Surface / Flow
+                    </p>
 
-                      <div className="flex justify-between items-center space-x-4">
+                    <div className="flex justify-between items-center space-x-4">
                         {/* Surface Velocity - only if selected */}
                         {selectedFields.includes('surface_velocity') && (
-                          <div className="flex-1">
-                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                              <Waves className="w-5 h-5 text-blue-400" />
-                              Surface Velocity
-                            </p>
-                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                      <div className="flex-1">
+                        <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                          <Waves className="w-5 h-5 text-blue-400" />
+                          Surface Velocity
+                        </p>
+                        <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
                               {formatValue(data.surface_velocity, 2, isMaintenance)} {isMaintenance ? "" : "m/s"}
-                            </p>
-                          </div>
+                        </p>
+                      </div>
                         )}
 
                         {/* Avg Velocity - only if selected */}
                         {selectedFields.includes('avg_surface_velocity') && (
-                          <div className="flex-1">
-                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                              <Waves className="w-5 h-5 text-cyan-400" />
-                              Avg Velocity
-                            </p>
-                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                      <div className="flex-1">
+                        <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                          <Waves className="w-5 h-5 text-cyan-400" />
+                          Avg Velocity
+                        </p>
+                        <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
                               {formatValue(data.avg_surface_velocity, 2, isMaintenance)} {isMaintenance ? "" : "m/s"}
-                            </p>
-                          </div>
+                        </p>
+                      </div>
                         )}
 
                         {/* SNR - only if selected */}
                         {selectedFields.includes('SNR') && (
-                          <div className="flex-1">
-                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                              <TrendingUp className="w-5 h-5 text-purple-400" />
-                              SNR
-                            </p>
-                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                        <div className="flex-1">
+                          <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                            <TrendingUp className="w-5 h-5 text-purple-400" />
+                            SNR
+                          </p>
+                          <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
                               {formatValue(data.SNR, 2, isMaintenance)} {isMaintenance ? "" : "dB"}
-                            </p>
-                          </div>
-                        )}
+                          </p>
+                        </div>
+                      )}
 
                         {/* Discharge - only if selected */}
                         {selectedFields.includes('water_discharge') && (
-                          <div className="flex-1">
-                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                              <Gauge className="w-5 h-5 text-green-400" />
-                              Discharge
-                            </p>
-                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                      <div className="flex-1">
+                        <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                          <Gauge className="w-5 h-5 text-green-400" />
+                          Discharge
+                        </p>
+                        <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
                               {isMaintenance 
                                 ? "NIL"
                                 : data.water_discharge === null
-                                ? "-"
-                                : `${formatValue(data.water_discharge, 2)} m³/s`}
-                            </p>
-                          </div>
-                        )}
+                            ? "-"
+                            : `${formatValue(data.water_discharge, 2)} m³/s`}
+                        </p>
                       </div>
+                        )}
                     </div>
+                  </div>
                   )}
 
                   {/* WATER LEVEL / DISTANCE - only show if at least one field is selected */}
                   {(selectedFields.includes('water_level') || selectedFields.includes('water_dist_sensor') || 
                     selectedFields.includes('tilt_angle') || selectedFields.includes('flow_direction')) && (
-                    <div
-                      className={`p-3 rounded-xl border ${
-                        isDarkTheme
-                          ? "bg-[#0f2a59]/60 border-[#1f4fa8]/30 text-slate-100"
-                          : "bg-white border-gray-100"
-                      }`}
-                    >
-                      <p className={`text-xs mb-2 ${isDarkTheme ? "text-amber-200" : "text-amber-600"}`}>
-                        Water Level / Distance
-                      </p>
+                  <div
+                    className={`p-3 rounded-xl border ${
+                      isDarkTheme
+                        ? "bg-[#0f2a59]/60 border-[#1f4fa8]/30 text-slate-100"
+                        : "bg-white border-gray-100"
+                    }`}
+                  >
+                    <p className={`text-xs mb-2 ${isDarkTheme ? "text-amber-200" : "text-amber-600"}`}>
+                      Water Level / Distance
+                    </p>
 
-                      <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center">
 
                         {/* Water Level - only if selected */}
                         {selectedFields.includes('water_level') && (
-                          <div>
-                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                              <Droplets className="w-5 h-5 text-blue-500" />
-                              Water Level
-                            </p>
-                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                      <div>
+                        <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                          <Droplets className="w-5 h-5 text-blue-500" />
+                          Water Level
+                        </p>
+                        <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
                               {formatValue(data.water_level, 2, isMaintenance)} {isMaintenance ? "" : "m"}
-                            </p>
-                          </div>
+                        </p>
+                      </div>
                         )}
 
                         {/* Distance Sensor - only if selected */}
                         {selectedFields.includes('water_dist_sensor') && (
-                          <div>
-                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                              <ScanLine className="w-5 h-5 text-purple-400" />
-                              Distance from Sensor
-                            </p>
-                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                      <div>
+                        <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                          <ScanLine className="w-5 h-5 text-purple-400" />
+                          Distance from Sensor
+                        </p>
+                        <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
                               {formatValue(data.water_dist_sensor, 2, isMaintenance)} {isMaintenance ? "" : "m"}
-                            </p>
-                          </div>
+                        </p>
+                      </div>
                         )}
 
                         {/* Tilt - only if selected */}
                         {selectedFields.includes('tilt_angle') && (
-                          <div>
-                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                              <TrendingUp className="w-5 h-5 text-orange-400" />
-                              Tilt
-                            </p>
-                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                      <div>
+                        <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                          <TrendingUp className="w-5 h-5 text-orange-400" />
+                          Tilt
+                        </p>
+                        <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
                               {formatValue(data.tilt_angle, 1, isMaintenance)} {isMaintenance ? "" : "°"}
-                            </p>
-                          </div>
+                        </p>
+                      </div>
                         )}
 
                         {/* Flow Direction - only if selected */}
                         {selectedFields.includes('flow_direction') && (
-                          <div>
-                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                              <Compass className="w-5 h-5 text-amber-400" />
-                              Flow Dir
-                            </p>
-                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                      <div>
+                        <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                          <Compass className="w-5 h-5 text-amber-400" />
+                          Flow Dir
+                        </p>
+                        <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
                               {isMaintenance ? "NIL" : displayFlowDirection(data.flow_direction)}
-                            </p>
-                          </div>
-                        )}
+                        </p>
                       </div>
+                        )}
                     </div>
+                  </div>
                   )}
 
                   {/* POWER SECTION - only show if at least one power field is selected */}
@@ -908,67 +908,67 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
                       <div className="grid grid-cols-2 gap-3">
                         {/* Internal Temperature - only if selected */}
                         {selectedFields.includes('internal_temperature') && (
-                          <div>
-                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                              <Thermometer className="w-5 h-5 text-red-400" />
-                              Internal Temperature
-                            </p>
-                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                        <div>
+                          <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                            <Thermometer className="w-5 h-5 text-red-400" />
+                            Internal Temperature
+                          </p>
+                          <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
                               {formatValue(data.internal_temperature, 1, isMaintenance)} {isMaintenance ? "" : "°C"}
-                            </p>
-                          </div>
+                          </p>
+                        </div>
                         )}
 
                         {/* Charge Current - only if selected */}
                         {selectedFields.includes('charge_current') && (
-                          <div>
-                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                              <BatteryCharging className="w-5 h-5 text-green-400" />
-                              Charge Current
-                            </p>
-                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                        <div>
+                          <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                            <BatteryCharging className="w-5 h-5 text-green-400" />
+                            Charge Current
+                          </p>
+                          <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
                               {formatValue(data.charge_current, 4, isMaintenance)} {isMaintenance ? "" : "A"}
-                            </p>
-                          </div>
+                          </p>
+                        </div>
                         )}
 
                         {/* Absorbed Current - only if selected */}
                         {selectedFields.includes('observed_current') && (
-                          <div>
-                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                              <Zap className="w-5 h-5 text-yellow-400" />
-                              Absorbed Current
-                            </p>
-                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                        <div>
+                          <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                            <Zap className="w-5 h-5 text-yellow-400" />
+                            Absorbed Current
+                          </p>
+                          <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
                               {formatValue(data.absorbed_current, 4, isMaintenance)} {isMaintenance ? "" : "A"}
-                            </p>
-                          </div>
+                          </p>
+                        </div>
                         )}
 
                         {/* Battery Voltage - only if selected */}
                         {selectedFields.includes('battery_voltage') && (
-                          <div>
-                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                              <Battery className="w-5 h-5 text-blue-400" />
-                              Battery Voltage
-                            </p>
-                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                        <div>
+                          <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                            <Battery className="w-5 h-5 text-blue-400" />
+                            Battery Voltage
+                          </p>
+                          <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
                               {formatValue(data.battery_voltage, 1, isMaintenance)} {isMaintenance ? "" : "V"}
-                            </p>
-                          </div>
+                          </p>
+                        </div>
                         )}
 
                         {/* Solar Panel Tracking - only if selected */}
                         {selectedFields.includes('solar_panel_tracking') && (
-                          <div className="col-span-2">
-                            <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
-                              <Sun className="w-5 h-5 text-orange-400" />
-                              Solar Panel Tracking
-                            </p>
-                            <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
-                              {formatValue(data.solar_panel_tracking, 1)} V
-                            </p>
-                          </div>
+                        <div className="col-span-2">
+                          <p className={`text-xs flex items-center gap-1.5 ${isDarkTheme ? "text-slate-300" : "text-gray-500"}`}>
+                            <Sun className="w-5 h-5 text-orange-400" />
+                            Solar Panel Tracking
+                          </p>
+                          <p className={`text-xs font-semibold ${isDarkTheme ? "text-white" : "text-gray-800"}`}>
+                            {formatValue(data.solar_panel_tracking, 1)} V
+                          </p>
+                        </div>
                         )}
                       </div>
                     </div>

@@ -123,7 +123,7 @@ export default function AdminHome() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {userManagementItems.map((item, index) => renderCard(item, index))}
           </div>
-        </div>
+      </div>
 
         {/* Station Management Section */}
         <div>
@@ -133,15 +133,15 @@ export default function AdminHome() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {stationManagementItems.map((item, index) => renderCard(item, index + userManagementItems.length))}
-          </div>
-        </div>
+              </div>
+              </div>
 
         {/* Other/Settings Section */}
-        <div>
+              <div>
           <div className="flex items-center gap-3 mb-4">
             <div className="h-1 w-12 bg-gray-600 rounded"></div>
             <h2 className="text-2xl font-bold text-gray-800">Settings</h2>
-          </div>
+              </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {otherItems.map((item, index) => renderCard(item, index + userManagementItems.length + stationManagementItems.length))}
           </div>

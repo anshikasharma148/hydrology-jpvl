@@ -40,7 +40,7 @@ export default function UserManagement() {
   }, []);
 
   // ✅ Reset Password
-const handleResetPassword = async (userId, userName) => {
+  const handleResetPassword = async (userId, userName) => {
     const confirmed = await showConfirm(`Reset password for ${userName} to default (cdc@123)?`);
     if (!confirmed) return;
     try {

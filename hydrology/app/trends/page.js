@@ -766,15 +766,15 @@ function TrendsPageContent() {
             </div>
 
             <div className="flex items-center gap-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    <MapPin className="w-4 h-4 mr-2" />
-                    {(
-                      selectedType === "AWS" ? awsStations : ewsStations
-                    ).find((x) => x.slug === selectedStation)?.name || "Station"}
-                  </Button>
-                </DropdownMenuTrigger>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <MapPin className="w-4 h-4 mr-2" />
+                  {(
+                    selectedType === "AWS" ? awsStations : ewsStations
+                  ).find((x) => x.slug === selectedStation)?.name || "Station"}
+                </Button>
+              </DropdownMenuTrigger>
 
               <DropdownMenuContent>
                 <DropdownMenuLabel>Stations</DropdownMenuLabel>

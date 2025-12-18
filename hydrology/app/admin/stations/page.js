@@ -285,34 +285,34 @@ const StationForm = () => {
       <div className="w-full max-w-6xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-6 sm:p-10">
           {/* Stepper */}
-          <div className="mb-10 relative">
-            <div className="absolute top-4 left-0 w-full h-0.5 bg-gray-300"></div>
-            <div
+<div className="mb-10 relative">
+  <div className="absolute top-4 left-0 w-full h-0.5 bg-gray-300"></div>
+  <div
               className="absolute top-4 left-0 h-0.5 bg-blue-600 transition-all duration-500"
               style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
-            ></div>
-            <div className="flex justify-between relative z-10">
+  ></div>
+  <div className="flex justify-between relative z-10">
               {steps.map((label, index) => {
-                const step = index + 1;
-                return (
-                  <div key={label} className="flex flex-col items-center flex-1">
-                    <div
+      const step = index + 1;
+      return (
+        <div key={label} className="flex flex-col items-center flex-1">
+          <div
                       className={`w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-full border-2 transition-colors duration-300 ${
-                        currentStep >= step
+                currentStep >= step
                           ? "bg-blue-600 border-blue-600 text-white"
-                          : "bg-white border-gray-300 text-gray-400"
-                      }`}
-                    >
-                      {step}
-                    </div>
-                    <span className="mt-2 text-xs sm:text-sm font-medium text-gray-700">
-                      {label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+                  : "bg-white border-gray-300 text-gray-400"
+              }`}
+          >
+            {step}
           </div>
+          <span className="mt-2 text-xs sm:text-sm font-medium text-gray-700">
+            {label}
+          </span>
+        </div>
+      );
+    })}
+  </div>
+</div>
 
           <form onSubmit={handleSubmit}>
             {/* Step 1: Basic Information */}
@@ -354,63 +354,63 @@ const StationForm = () => {
                         <span className="text-gray-700">EWS (Barrage Monitoring)</span>
                       </label>
                     </div>
-                  </div>
-
-                  {/* Station ID */}
-                  <div>
+        </div>
+            
+            {/* Station ID */}
+            <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Station ID <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="stationId"
-                      value={formData.stationId}
-                      onChange={handleChange}
+              </label>
+              <input
+                type="text"
+                name="stationId"
+                value={formData.stationId}
+                onChange={handleChange}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="e.g., ST021"
-                      required
-                    />
-                  </div>
+                required
+              />
+            </div>
 
-                  {/* Station Name */}
-                  <div>
+            {/* Station Name */}
+            <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Station Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="stationName"
-                      value={formData.stationName}
-                      onChange={handleChange}
+              </label>
+              <input
+                type="text"
+                name="stationName"
+                value={formData.stationName}
+                onChange={handleChange}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="e.g., New Station"
-                      required
-                    />
-                  </div>
+                required
+              />
+            </div>
 
                   {/* Device ID */}
-                  <div>
+            <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Device ID <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
+              </label>
+              <input
+                type="text"
                       name="deviceId"
                       value={formData.deviceId}
-                      onChange={handleChange}
+                onChange={handleChange}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="e.g., 31931"
-                      required
-                    />
-                  </div>
+                required
+              />
+            </div>
 
                   {/* CSV Folder Path */}
-                  <div>
+            <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       CSV Folder Path <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
+              </label>
+              <input
+                type="text"
                       name="csvFolderPath"
                       value={formData.csvFolderPath}
                       onChange={handleChange}
@@ -449,69 +449,69 @@ const StationForm = () => {
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Longitude</label>
                     <input
                       type="text"
-                      name="longitude"
-                      value={formData.longitude}
-                      onChange={handleChange}
+                name="longitude"
+                value={formData.longitude}
+                onChange={handleChange}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="e.g., 79.452111"
-                    />
-                  </div>
-                  <div>
+              />
+            </div>
+            <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Latitude</label>
-                    <input
-                      type="text"
-                      name="latitude"
-                      value={formData.latitude}
-                      onChange={handleChange}
+              <input
+                type="text"
+                name="latitude"
+                value={formData.latitude}
+                onChange={handleChange}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="e.g., 30.7880086"
-                    />
-                  </div>
-                  <div>
+              />
+            </div>
+            <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Country</label>
-                    <input
-                      type="text"
-                      name="country"
-                      value={formData.country}
-                      onChange={handleChange}
+              <input
+                type="text"
+                name="country"
+                value={formData.country}
+                onChange={handleChange}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="e.g., India"
-                    />
-                  </div>
-                  <div>
+              />
+            </div>
+            <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">State</label>
-                    <input
-                      type="text"
-                      name="state"
-                      value={formData.state}
-                      onChange={handleChange}
+              <input
+                type="text"
+                name="state"
+                value={formData.state}
+                onChange={handleChange}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="e.g., Uttarakhand"
-                    />
-                  </div>
-                  <div>
+              />
+            </div>
+            <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">District</label>
-                    <input
-                      type="text"
-                      name="district"
-                      value={formData.district}
-                      onChange={handleChange}
+              <input
+                type="text"
+                name="district"
+                value={formData.district}
+                onChange={handleChange}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="e.g., Chamoli"
-                    />
-                  </div>
-                  <div>
+              />
+            </div>
+            <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Pin Code</label>
-                    <input
-                      type="text"
-                      name="pinCode"
-                      value={formData.pinCode}
-                      onChange={handleChange}
+              <input
+                type="text"
+                name="pinCode"
+                value={formData.pinCode}
+                onChange={handleChange}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="e.g., 246422"
-                    />
+              />
                   </div>
-                </div>
+            </div>
 
                 <div className="flex justify-between">
                   <button
@@ -521,7 +521,7 @@ const StationForm = () => {
                   >
                     Previous
                   </button>
-                  <button
+              <button
                     type="button"
                     onClick={() => setCurrentStep(3)}
                     className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
@@ -605,9 +605,9 @@ const StationForm = () => {
                       className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
                     >
                       + Add Custom Field
-                    </button>
-                  </div>
-                  
+              </button>
+            </div>
+
                   {customFields.length === 0 ? (
                     <p className="text-sm text-gray-600">No custom fields added yet</p>
                   ) : (
@@ -764,12 +764,12 @@ const StationForm = () => {
                   >
                     {isSubmitting ? 'Registering...' : 'Register Station'}
                   </button>
-                </div>
+          </div>
               </motion.div>
             )}
-          </form>
-        </div>
+        </form>
       </div>
+    </div>
     </AdminLayout>
   );
 };

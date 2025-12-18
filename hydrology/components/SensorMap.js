@@ -95,34 +95,34 @@ const FreshSensorMap = () => {
     if (!allStations || allStations.length === 0) {
       // Fallback to hardcoded stations if database is empty
       return [
-        {
-          key: "mana",
-          name: "Mana",
-          lat: 30.763327,
-          lng: 79.49845,
-          hasEws: true,
-          image: "/dash_station_img/mana.jpg",
+    {
+      key: "mana",
+      name: "Mana",
+      lat: 30.763327,
+      lng: 79.49845,
+      hasEws: true,
+      image: "/dash_station_img/mana.jpg",
           stationId: "ST019",
-        },
-        {
-          key: "vasudhara",
-          name: "Vasudhara",
-          lat: 30.7880086,
-          lng: 79.452111,
-          hasEws: true,
-          image: "/dash_station_img/vasudhara.png",
+    },
+    {
+      key: "vasudhara",
+      name: "Vasudhara",
+      lat: 30.7880086,
+      lng: 79.452111,
+      hasEws: true,
+      image: "/dash_station_img/vasudhara.png",
           stationId: "ST020",
-        },
-        {
-          key: "barrage",
-          name: "Barrage",
-          lat: dmsToDecimal(30, 40, 20.9),
-          lng: dmsToDecimal(79, 30, 49.0),
-          hasEws: false,
-          image: "/dash_station_img/barrage.jpg",
+    },
+    {
+      key: "barrage",
+      name: "Barrage",
+      lat: dmsToDecimal(30, 40, 20.9),
+      lng: dmsToDecimal(79, 30, 49.0),
+      hasEws: false,
+      image: "/dash_station_img/barrage.jpg",
           stationId: "ST015",
-        },
-      ];
+    },
+  ];
     }
     
     // Get EWS station names for hasEws check
