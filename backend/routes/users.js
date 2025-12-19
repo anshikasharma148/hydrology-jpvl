@@ -415,7 +415,7 @@ router.post("/admin-login", async (req, res) => {
       await logLoginAttempt(user.id, email, fullName, user.role, ipAddress, 'admin', 'failed', userLocation);
       return res.status(403).json({ message: "Access denied. Not an admin" });
     }
-    
+
     console.log(`[ADMIN LOGIN] Role validation passed. Proceeding with password check.`);
 
     const admin = user;

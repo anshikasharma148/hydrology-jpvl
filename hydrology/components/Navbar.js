@@ -279,7 +279,7 @@ export default function Navbar() {
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
-          
+
           // Special handling for Trends dropdown
           if (item.name === "Trends") {
             return (
