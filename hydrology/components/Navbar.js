@@ -211,6 +211,9 @@ export default function Navbar() {
 
   // Check if user is admin
   const isAdmin = user?.role === "Admin" || user?.role === "admin";
+  
+  // Check if currently in admin mode
+  const isAdminMode = pathname?.startsWith("/admin");
 
   useEffect(() => {
     const handleScroll = () => {
@@ -481,25 +484,36 @@ export default function Navbar() {
         {isAdmin && (
           <button
             onClick={() => {
-              // Ensure adminToken cookie is set for admin pages
-              const token = localStorage.getItem("token");
-              if (token) {
-                document.cookie = `adminToken=${token}; path=/;`;
+              if (isAdminMode) {
+                // Currently in admin mode, switch to dashboard
+                router.push("/dashboard");
+              } else {
+                // Currently in dashboard mode, switch to admin
+                const token = localStorage.getItem("token");
+                if (token) {
+                  document.cookie = `adminToken=${token}; path=/;`;
+                }
+                router.push("/admin");
               }
-              router.push("/admin");
             }}
-            className="hidden md:flex items-center space-x-2 px-4 py-2 
-               text-white 
-               bg-purple-600/80 
-               border border-purple-600 
-               backdrop-blur-sm 
-               rounded-md 
-               transition-all duration-300 
-               hover:bg-purple-700 hover:shadow-lg hover:shadow-purple-500/40"
-            title="Switch to Admin Panel"
+            className={`hidden md:flex items-center space-x-2 px-4 py-2 
+               border backdrop-blur-sm rounded-md transition-all duration-300 relative overflow-hidden
+               ${isAdminMode 
+                 ? "text-white bg-purple-600/90 border-purple-600 hover:bg-purple-700 hover:shadow-lg hover:shadow-purple-500/40" 
+                 : "text-purple-700 bg-purple-50/80 border-purple-300 hover:bg-purple-100 hover:shadow-md"
+               }`}
+            title={isAdminMode ? "Switch to Dashboard" : "Switch to Admin Panel"}
           >
-            <Settings size={18} />
-            <span>Admin Panel</span>
+            {/* Toggle Switch Indicator */}
+            <div className={`relative w-10 h-5 rounded-full transition-all duration-300 ${
+              isAdminMode ? "bg-white/30" : "bg-purple-200"
+            }`}>
+              <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${
+                isAdminMode ? "translate-x-5" : "translate-x-0"
+              }`}></div>
+            </div>
+            <Settings size={18} className={isAdminMode ? "text-white" : "text-purple-600"} />
+            <span className="font-medium">{isAdminMode ? "Admin Mode" : "User Mode"}</span>
           </button>
         )}
 
@@ -573,18 +587,37 @@ export default function Navbar() {
               {isAdmin && (
                 <button
                   onClick={() => {
-                    // Ensure adminToken cookie is set for admin pages
-                    const token = localStorage.getItem("token");
-                    if (token) {
-                      document.cookie = `adminToken=${token}; path=/;`;
+                    if (isAdminMode) {
+                      // Currently in admin mode, switch to dashboard
+                      router.push("/dashboard");
+                    } else {
+                      // Currently in dashboard mode, switch to admin
+                      const token = localStorage.getItem("token");
+                      if (token) {
+                        document.cookie = `adminToken=${token}; path=/;`;
+                      }
+                      router.push("/admin");
                     }
-                    router.push("/admin");
                     setMenuOpen(false);
                   }}
-                  className="flex items-center px-4 py-3 text-base text-gray-700 hover:bg-gray-100 w-full"
+                  className={`flex items-center justify-between px-4 py-3 text-base w-full transition-colors ${
+                    isAdminMode 
+                      ? "bg-purple-50 text-purple-700 hover:bg-purple-100" 
+                      : "text-gray-700 hover:bg-gray-100"
+                  }`}
                 >
-                  <Settings size={20} className="mr-3" />
-                  Admin Panel
+                  <div className="flex items-center">
+                    <Settings size={20} className="mr-3" />
+                    <span className="font-medium">{isAdminMode ? "Switch to Dashboard" : "Switch to Admin Panel"}</span>
+                  </div>
+                  {/* Toggle Switch Indicator */}
+                  <div className={`relative w-10 h-5 rounded-full transition-all duration-300 ${
+                    isAdminMode ? "bg-purple-600" : "bg-gray-300"
+                  }`}>
+                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${
+                      isAdminMode ? "translate-x-5" : "translate-x-0"
+                    }`}></div>
+                  </div>
                 </button>
               )}
 
