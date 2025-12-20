@@ -645,20 +645,21 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
     }));
   }, [ewsStations]);
 
-  // count actives across all EWS stations dynamically
+  // count actives across all EWS stations dynamically - only count "Live" status
   const activeCount = React.useMemo(() => {
     return stationsToShow.reduce((acc, st) => {
       const rec = ewsLatest?.[st.key];
-    if (rec && rec.timestamp) {
-      const parsed = Date.parse(rec.timestamp);
-      if (!isNaN(parsed)) {
-        const diffMin = (Date.now() - parsed) / (1000 * 60);
-        if (diffMin <= 20) acc += 1;
+      const stationId = st.stationId;
+      if (rec) {
+        const statusInfo = getStationStatus(stationId, "EWS", rec.timestamp, 20);
+        // Only count if status is "live" (not "offline" or "maintenance")
+        if (statusInfo.status === "live") {
+          acc += 1;
+        }
       }
-    }
-    return acc;
-  }, 0);
-  }, [stationsToShow, ewsLatest]);
+      return acc;
+    }, 0);
+  }, [stationsToShow, ewsLatest, getStationStatus]);
 
   return (
     <motion.div
@@ -1078,6 +1079,19 @@ function WeatherStationsSection({ weatherData, StationBadge, isDarkTheme, timest
     return Number.isFinite(n) ? `${n}°` : "-";
   };
 
+  // count actives across all AWS stations dynamically - only count "Live" status
+  const activeCount = React.useMemo(() => {
+    return weatherData.reduce((acc, station) => {
+      const stationId = STATION_ID_MAP[station.station] || null;
+      const statusInfo = getStationStatus(stationId, "AWS", station.timestamp, 30);
+      // Only count if status is "live" (not "offline" or "maintenance")
+      if (statusInfo.status === "live") {
+        acc += 1;
+      }
+      return acc;
+    }, 0);
+  }, [weatherData, STATION_ID_MAP, getStationStatus]);
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -1105,7 +1119,7 @@ function WeatherStationsSection({ weatherData, StationBadge, isDarkTheme, timest
               : "text-amber-600 bg-amber-100 border border-amber-200"
           }`}
         >
-          {weatherData.length} active
+          {activeCount} active
         </span>
       </div>
 
