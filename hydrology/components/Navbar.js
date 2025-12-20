@@ -15,6 +15,7 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useStations } from "../hooks/useStations";
+import SettingsModal from "./SettingsModal";
 
 export default function Navbar() {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function Navbar() {
   const [trendsHover, setTrendsHover] = useState(false);
   const [trendsSubmenu, setTrendsSubmenu] = useState(null); // 'aws' or 'ews'
   const [trendsStation, setTrendsStation] = useState(null);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const trendsRef = useRef(null);
   const trendsTimeoutRef = useRef(null);
   const pathname = usePathname();
@@ -480,6 +482,23 @@ export default function Navbar() {
           <span className="font-semibold text-blue-700">{fullName}</span>
         </div>
 
+        {/* Settings Button (Desktop) */}
+        <button
+          onClick={() => setSettingsModalOpen(true)}
+          className="hidden md:flex items-center space-x-2 px-4 py-2 
+             text-gray-700 
+             bg-gray-50/80 
+             border border-gray-300 
+             backdrop-blur-sm 
+             rounded-md 
+             transition-all duration-300 
+             hover:bg-gray-100 hover:shadow-md"
+          title="Settings"
+        >
+          <Settings size={18} />
+          <span>Settings</span>
+        </button>
+
         {/* Admin Panel Toggle Button (Desktop) - Only show for admins */}
         {isAdmin && (
           <button
@@ -574,14 +593,16 @@ export default function Navbar() {
             })}
 
             <div className="border-t border-gray-200 mt-2 pt-2">
-              <Link
-                href="/settings"
-                className="flex items-center px-4 py-3 text-base text-gray-700 hover:bg-gray-100"
-                onClick={() => setMenuOpen(false)}
+              <button
+                onClick={() => {
+                  setSettingsModalOpen(true);
+                  setMenuOpen(false);
+                }}
+                className="flex items-center w-full px-4 py-3 text-base text-gray-700 hover:bg-gray-100"
               >
                 <Settings size={20} className="mr-3" />
                 Settings
-              </Link>
+              </button>
 
               {/* Admin Panel Toggle Button (Mobile) - Only show for admins */}
               {isAdmin && (
@@ -644,6 +665,9 @@ export default function Navbar() {
           </div>
         </div>
       )}
+
+      {/* Settings Modal */}
+      <SettingsModal isOpen={settingsModalOpen} onClose={() => setSettingsModalOpen(false)} />
     </nav>
   );
 }

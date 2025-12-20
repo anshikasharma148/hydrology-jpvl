@@ -7,6 +7,8 @@ import AddStationForm from "../../components/AddStationForm";
 import dynamic from "next/dynamic";
 import { useStationStatus } from "../../hooks/useStationStatus";
 import { useStations } from "../../hooks/useStations";
+import { useSettings } from "../../hooks/useSettings";
+import { formatDateTime, formatNumber } from "../../utils/formatUtils";
 import { ArrowLeft, Thermometer, Battery, BatteryCharging, Zap, Sun, Gauge, Droplets, Wind, Compass, Ruler, TrendingUp, Waves, ScanLine } from "lucide-react";
 import {
   FaTemperatureHigh,
@@ -55,6 +57,9 @@ export default function Dashboard() {
   
   // Fetch dynamic stations
   const { stations, awsStations, ewsStations, loading: stationsLoading } = useStations();
+  
+  // Settings hook
+  const { settings } = useSettings();
 
   // Build DEVICE + STATION ID mapping dynamically from fetched stations
   const DEVICE_MAP = React.useMemo(() => {
@@ -365,14 +370,17 @@ export default function Dashboard() {
     fetchLiveEWSData();
     fetchLiveAWSData();
     
-    // Set up interval
-    const id = setInterval(() => {
-      fetchLiveEWSData();
-      fetchLiveAWSData();
-    }, 10_000);
-    return () => clearInterval(id);
+    // Set up interval (use settings.refreshInterval, or 10s default)
+    const refreshInterval = settings?.refreshInterval || 10000;
+    if (refreshInterval > 0) {
+      const id = setInterval(() => {
+        fetchLiveEWSData();
+        fetchLiveAWSData();
+      }, refreshInterval);
+      return () => clearInterval(id);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stationsLoading, awsStations.length, ewsStations.length]);
+  }, [stationsLoading, awsStations.length, ewsStations.length, settings?.refreshInterval]);
 
   const parseUTC = (ts) => {
     if (!ts) return null;
@@ -388,39 +396,8 @@ export default function Dashboard() {
     return diffMin <= thresholdMin;
   };
 
-  // format date/time as "24 Nov 2025, 12:30 PM" (no device id)
-  const formatDateTime = (ts) => {
-    if (!ts) return null;
-    // MySQL DATETIME format is "YYYY-MM-DD HH:MM:SS" (no timezone)
-    // Treat it as local sensor time (not UTC)
-    let clean = ts;
-    if (typeof ts === 'string') {
-      // Remove "Z" if present (from ISO format)
-      clean = ts.replace("Z", "");
-      // If it's MySQL DATETIME format (YYYY-MM-DD HH:MM:SS), add "T" to make it parseable
-      if (clean.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/)) {
-        clean = clean.replace(" ", "T");
-      }
-    } else if (ts instanceof Date) {
-      // If it's already a Date object, convert to ISO string and remove Z
-      clean = ts.toISOString().replace("Z", "");
-    }
-    // Create date as if the timestamp is already local sensor time
-    const d = new Date(clean);
-    if (isNaN(d.getTime())) {
-      console.warn("Failed to parse timestamp:", ts);
-      return null;
-    }
-    const year = d.getFullYear();
-    const month = d.toLocaleString("en-GB", { month: "short" });
-    const day = String(d.getDate()).padStart(2, "0");
-    let hour = d.getHours();
-    const minute = String(d.getMinutes()).padStart(2, "0");
-    const ampm = hour >= 12 ? "PM" : "AM";
-    const hour12 = hour % 12 || 12;
-    
-    return `${day} ${month} ${year}, ${hour12}:${minute} ${ampm}`;
-  };
+  // Use formatDateTime utility from formatUtils
+  const formatDateTimeLocal = (ts) => formatDateTime(ts, settings);
 
   // the unified live badge (blinking style as you asked)
   // Updated to support manual status management
@@ -479,9 +456,9 @@ export default function Dashboard() {
     return <LiveBadge timestamp={timestamp} isDarkTheme={isDarkTheme} thresholdMin={20} stationId={stationId} serviceType="EWS" />;
   };
 
-  // timestamp printing (no device)
+  // timestamp printing (no device) - using formatDateTime utility
   const timestampLine = (ts) => {
-    const dt = formatDateTime(ts);
+    const dt = formatDateTimeLocal(ts);
     if (!dt) return `No timestamp`;
     return `${dt}`;
   };
@@ -541,7 +518,7 @@ export default function Dashboard() {
               ewsLatest={ewsLatest}
               isDarkTheme={isDarkTheme}
               BarrageBadge={BarrageBadge}
-              timestampLine={timestampLine}
+              timestampLine={formatDateTimeLocal}
               getStationStatus={getStationStatus}
               ewsStations={ewsStations}
             />
@@ -567,7 +544,7 @@ export default function Dashboard() {
               weatherData={weatherData}
               StationBadge={StationBadge}
               isDarkTheme={isDarkTheme}
-              timestampLine={timestampLine}
+              timestampLine={formatDateTimeLocal}
               getStationStatus={getStationStatus}
               awsStations={awsStations}
             />
@@ -590,13 +567,13 @@ export default function Dashboard() {
    BarrageMonitoring (Vasudhara + Mana cards)
 --------------------------- */
 function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge, timestampLine, getStationStatus, ewsStations }) {
-  const formatValue = (v, digits = 2, isMaintenance = false) => {
+  const { settings } = useSettings();
+  
+  const formatValue = (v, digits = null, isMaintenance = false) => {
     if (isMaintenance) return "NIL";
     if (v === null || v === undefined || v === "") return "-";
-    if (typeof v === "number") return Number.isInteger(v) ? v : Number(v.toFixed(digits));
-    const n = Number(v);
-    if (Number.isFinite(n)) return Number.isInteger(n) ? n : Number(n.toFixed(digits));
-    return String(v);
+    const precision = digits !== null ? digits : (settings?.decimalPrecision || 2);
+    return formatNumber(v, settings, precision);
   };
   
   // Build Station ID mapping dynamically from ewsStations
@@ -620,6 +597,7 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
 
   // Build stations list dynamically from ewsStations
   // Order: Vasudhara first, then Mana, then others
+  // Filter by visibleStations setting if specified
   const stationsToShow = React.useMemo(() => {
     if (!ewsStations || ewsStations.length === 0) {
       return [
@@ -627,8 +605,15 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
         { key: "Mana", label: "Mana", stationId: "ST019" },
       ];
     }
+    // Filter by visibleStations if specified
+    let filtered = ewsStations;
+    if (settings?.visibleStations && settings.visibleStations.length > 0) {
+      filtered = ewsStations.filter(station => 
+        settings.visibleStations.includes(station.StationID)
+      );
+    }
     // Sort: Vasudhara first, then Mana, then others alphabetically
-    const sorted = [...ewsStations].sort((a, b) => {
+    const sorted = [...filtered].sort((a, b) => {
       const nameA = a.station_name.toLowerCase();
       const nameB = b.station_name.toLowerCase();
       if (nameA === "vasudhara") return -1;
@@ -643,7 +628,7 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
       stationId: station.StationID,
       selectedFields: station.selected_fields || []
     }));
-  }, [ewsStations]);
+  }, [ewsStations, settings?.visibleStations]);
 
   // count actives across all EWS stations dynamically - only count "Live" status
   const activeCount = React.useMemo(() => {
@@ -989,10 +974,25 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
    WeatherStationsSection (updated timestamps, removed stationID & device)
    --------------------------- */
 function WeatherStationsSection({ weatherData, StationBadge, isDarkTheme, timestampLine, getStationStatus, awsStations }) {
+  const { settings } = useSettings();
+  
   const formatValue = (value, suffix = "", isMaintenance = false) => {
     if (isMaintenance) return "NIL";
-    return value === null || value === undefined || value === "" ? "-" : `${value} ${suffix}`.trim();
+    if (value === null || value === undefined || value === "") return "-";
+    const formatted = formatNumber(value, settings);
+    return `${formatted} ${suffix}`.trim();
   };
+  
+  // Filter weatherData based on visibleStations setting
+  const filteredWeatherData = React.useMemo(() => {
+    if (!settings?.visibleStations || settings.visibleStations.length === 0) {
+      return weatherData;
+    }
+    return weatherData.filter(station => {
+      const stationId = STATION_ID_MAP[station.station] || null;
+      return !stationId || settings.visibleStations.includes(stationId);
+    });
+  }, [weatherData, settings?.visibleStations]);
   
   // Build Station ID mapping dynamically from awsStations
   const STATION_ID_MAP = React.useMemo(() => {
@@ -1081,7 +1081,7 @@ function WeatherStationsSection({ weatherData, StationBadge, isDarkTheme, timest
 
   // count actives across all AWS stations dynamically - only count "Live" status
   const activeCount = React.useMemo(() => {
-    return weatherData.reduce((acc, station) => {
+    return filteredWeatherData.reduce((acc, station) => {
       const stationId = STATION_ID_MAP[station.station] || null;
       const statusInfo = getStationStatus(stationId, "AWS", station.timestamp, 30);
       // Only count if status is "live" (not "offline" or "maintenance")
@@ -1090,7 +1090,7 @@ function WeatherStationsSection({ weatherData, StationBadge, isDarkTheme, timest
       }
       return acc;
     }, 0);
-  }, [weatherData, STATION_ID_MAP, getStationStatus]);
+  }, [filteredWeatherData, STATION_ID_MAP, getStationStatus]);
 
   return (
     <motion.div
@@ -1123,11 +1123,11 @@ function WeatherStationsSection({ weatherData, StationBadge, isDarkTheme, timest
         </span>
       </div>
 
-      {weatherData.length === 0 ? (
+      {filteredWeatherData.length === 0 ? (
         <p className="text-center text-gray-400 mt-10">No weather data available</p>
       ) : (
         <div className="space-y-3">
-          {weatherData.map((station) => {
+          {filteredWeatherData.map((station) => {
             const stationId = STATION_ID_MAP[station.station] || null;
             const statusInfo = getStationStatus(stationId, "AWS", station.timestamp, 30);
             const isMaintenance = statusInfo.status === "maintenance";

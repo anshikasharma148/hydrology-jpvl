@@ -22,6 +22,7 @@ const userRoutes = require("./routes/users");
 const awsLiveRoutes = require("./hydrology_routes/aws_routes/aws_index");
 const ewsLiveRoutes = require("./hydrology_routes/ews_routes/ews_index");
 const awsForecastRoute = require("./routes/awsForecast");
+const settingsRoutes = require("./hydrology_routes/settings_routes/settings_index");
 
 // ======================================================
 // UPDATED CORS FOR RENDER + VERCEL
@@ -93,6 +94,7 @@ app.use("/api/aws-live", awsLiveRoutes);
 app.use("/api/ews-live", ewsLiveRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/aws-live", awsForecastRoute);
+app.use("/api/settings", settingsRoutes);
 
 // ======================================================
 // STATIC FRONTEND (OPTIONAL)

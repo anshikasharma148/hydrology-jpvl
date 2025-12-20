@@ -24,10 +24,11 @@ const hydrologyDB = mysql.createPool({
   database: "Hydrology",
 });
 
-// USERS DB (authentication DB)
+// USERS DB (authentication DB) - Now using Hydrology database
+// This consolidates everything into one database
 const usersDB = mysql.createPool({
   ...dbConfig,
-  database: "cdc_user_db",
+  database: "Hydrology",
 });
 
 // Add connection event listeners for debugging

@@ -6,6 +6,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useStationStatus } from "../hooks/useStationStatus";
 import { useStations } from "../hooks/useStations";
+import { useSettings } from "../hooks/useSettings";
+import { formatDateTime } from "../utils/formatUtils";
 import {
   Thermometer,
   Droplets,
@@ -27,27 +29,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: require("leaflet/dist/images/marker-shadow.png").default,
 });
 
-const formatTS = (ts) => {
-  if (!ts) return "---";
-  // Handle different timestamp types (string, number, Date)
-  let clean;
-  if (typeof ts === 'string') {
-    // Remove the timezone indicator "Z" so browser doesn't convert UTC → local time.
-    clean = ts.replace("Z", "");
-  } else if (typeof ts === 'number') {
-    // If it's a number (timestamp in ms), use it directly
-    clean = ts;
-  } else if (ts instanceof Date) {
-    // If it's already a Date object, use it directly
-    clean = ts;
-  } else {
-    clean = ts;
-  }
-  // Create date as if the timestamp is already local sensor time
-  const d = new Date(clean);
-  if (isNaN(d.getTime())) return "---";
-  return d.toLocaleString();
-};
+// formatTS is now handled by formatDateTime utility in the component
 const dmsToDecimal = (d, m, s) => d + m / 60 + s / 3600;
 
 // Animated River Layer
@@ -89,6 +71,7 @@ const FreshSensorMap = () => {
   const [loading, setLoading] = useState(true);
   const { getStationStatus } = useStationStatus();
   const { allStations, awsStations, ewsStations, loading: stationsLoading } = useStations();
+  const { settings } = useSettings();
   
   // Build stations array dynamically from database
   const stations = React.useMemo(() => {
@@ -330,8 +313,11 @@ const FreshSensorMap = () => {
       className: "rounded-full border-[3px] border-white shadow-xl",
     });
 
-  // Calculate map center from stations
+  // Calculate map center from stations or use settings
   const mapCenter = React.useMemo(() => {
+    if (settings?.mapSettings?.defaultCenter) {
+      return settings.mapSettings.defaultCenter;
+    }
     if (stations.length === 0) return [30.775, 79.48]; // Default center
     const avgLat = stations.reduce((sum, s) => sum + s.lat, 0) / stations.length;
     const avgLng = stations.reduce((sum, s) => sum + s.lng, 0) / stations.length;
@@ -340,7 +326,11 @@ const FreshSensorMap = () => {
 
   return (
     <div className="relative w-full h-full min-h-[500px] rounded-lg overflow-hidden shadow-xl">
-      <MapContainer center={mapCenter} zoom={12} className="w-full h-full z-0">
+      <MapContainer 
+        center={mapCenter} 
+        zoom={settings?.mapSettings?.defaultZoom || 12} 
+        className="w-full h-full z-0"
+      >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
         {/* Stations */}
@@ -594,7 +584,7 @@ const FreshSensorMap = () => {
                       style={{ borderColor: 'rgba(59, 130, 246, 0.2)', color: '#94a3b8' }}
                     >
                       <Clock className="w-2.5 h-2.5" />
-                      <span className="font-semibold">{formatTS(aws.timestamp)}</span>
+                      <span className="font-semibold">{formatDateTime(aws.timestamp, settings) || "---"}</span>
                   </div>
                   )}
 

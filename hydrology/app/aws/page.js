@@ -27,6 +27,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useStations } from "../../hooks/useStations";
+import { useSettings } from "../../hooks/useSettings";
 
 // Display names will be built dynamically from stations
 
@@ -229,6 +230,7 @@ const getTimeBasedTheme = () => {
 export default function AwsPage() {
   const router = useRouter();
   const { awsStations: awsStationsData, loading: stationsLoading } = useStations();
+  const { settings } = useSettings();
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -386,7 +388,11 @@ export default function AwsPage() {
     
     // Fetch data and set up interval
     fetchAWSData();
-    const i = setInterval(() => fetchAWSData(), 30000);
+    const refreshInterval = settings?.refreshInterval || 30000;
+    if (refreshInterval > 0) {
+      const i = setInterval(() => fetchAWSData(), refreshInterval);
+      return () => clearInterval(i);
+    }
     return () => clearInterval(i);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stationsLoading, awsStationsData.length]);

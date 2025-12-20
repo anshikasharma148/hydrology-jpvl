@@ -13,12 +13,14 @@ import Navbar from "../../components/Navbar";
 import EWSDashboardGraph from "../../components/EWSDashboardGraph";
 import { useStationStatus } from "../../hooks/useStationStatus";
 import { useStations } from "../../hooks/useStations";
+import { useSettings } from "../../hooks/useSettings";
 
 const SplashScreen = dynamic(() => import("../../components/SplashScreen"), { ssr: false });
 
 export default function EWSPage() {
   const router = useRouter();
   const { ewsStations: ewsStationsData, loading: stationsLoading } = useStations();
+  const { settings } = useSettings();
 
   const [liveStations, setLiveStations] = useState({});
   const [isLoading, setIsLoading] = useState(true);
@@ -167,7 +169,11 @@ export default function EWSPage() {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 10000);
+    const refreshInterval = settings?.refreshInterval || 10000;
+    if (refreshInterval > 0) {
+      const interval = setInterval(fetchData, refreshInterval);
+      return () => clearInterval(interval);
+    }
     return () => clearInterval(interval);
   }, [stationsLoading, ewsStationsData]);
 
