@@ -679,7 +679,7 @@ function BarrageMonitoring({ stationLabels, ewsLatest, isDarkTheme, BarrageBadge
       >
         <IoWater className={`text-2xl mr-2 ${isDarkTheme ? "text-cyan-300" : "text-blue-600"}`} />
         <h2 className={`text-lg font-semibold ${isDarkTheme ? "text-white" : "text-gray-700"}`}>
-          Barrage Monitoring
+          Early Warning Stations (EWS)
         </h2>
 
         <div
@@ -1096,7 +1096,7 @@ function WeatherStationsSection({ weatherData, StationBadge, isDarkTheme, timest
       >
         <IoPartlySunny className={`text-xl ${isDarkTheme ? "text-amber-300" : "text-amber-600"}`} />
         <h2 className={`text-base font-semibold ${isDarkTheme ? "text-white" : "text-gray-700"}`}>
-          Weather Stations
+          Automated Weather Stations (AWS)
         </h2>
         <span
           className={`text-xs px-2 py-0.5 rounded-full font-semibold border ${

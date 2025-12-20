@@ -53,10 +53,10 @@ router.get("/all", async (req, res) => {
     // Query data for each station dynamically
     for (const config of stationConfigs) {
       const [rows] = await db.query(`
-        SELECT *
-        FROM EWS_retrieved_db_data
+      SELECT *
+      FROM EWS_retrieved_db_data
         WHERE StationID = ?
-        ORDER BY timestamp DESC
+      ORDER BY timestamp DESC
       `, [config.StationID]);
 
       // Use station_name as key (matching frontend expectations)
